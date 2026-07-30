@@ -27,6 +27,7 @@ the heatmap desaturates them.*
 |---|---|
 | **Zetamac sprint** | 120s, +1 per correct, auto-advance on the correct keystroke sequence — locked to Zetamac's default ranges so scores calibrate against community numbers. Custom ranges are allowed but labelled and plotted separately. |
 | **Optiver 80-in-8** | 8 minutes, 80 questions, +1/−1, explicit Enter, skip scores 0. A *simulation*, not just a scorer: 3-2-1 pre-roll, no per-question feedback, running score hidden until the end, focus losses recorded, Esc discards. A review pass afterwards steps through every question. |
+| **Fermi sprint** | 120s of unwieldy estimation (48,213 × 677; 23% of 6,834,000) graded at ±5% relative error — the trading-interview skill the exact modes can't drill. Enter-commit only: auto-advance on a tolerance band would fire on lucky prefixes. |
 | **Focus drill** | Untimed, one question type, per-question millisecond timings — deliberate practice. |
 
 ## The differentiating feature: weakness-driven scheduling
@@ -72,6 +73,13 @@ kills the entire "was 0.33 close enough?" class of design questions: every
 answer is an integer, a small fraction, or a terminating decimal.
 Unsimplified fractions are accepted deliberately — the skill being drilled is
 arithmetic, not simplification.
+
+Two post-v1 stretch buckets relax this *by explicit, per-bucket contract* —
+repeating reciprocals grade to 3 significant figures and Fermi questions to
+±5% relative error — and even those tolerances are computed in integer
+arithmetic, never float comparison. Exact-graded buckets are untouched, and
+the tolerance modes can't leak into them by construction (they're separate
+`grading` values pinned by property tests).
 
 The input grammar is frozen (`int | decimal | fraction`, filtered at keystroke
 level) and pinned down by a table of accept/reject test rows, not prose.
@@ -148,6 +156,32 @@ offline-capable).
 - No accounts, no sync, no backend — a backend would double the build for zero
   interview value. Same-seed challenge links give 90% of head-to-head for 0% of
   the cost.
+
+## Stretch goals, shipped
+
+Everything on the design doc's stretch list except the explicitly-rejected
+WebRTC head-to-head:
+
+- **Repeating-decimal reciprocals** (`recip:rep`: 1/3, 1/7, …) with 3-s.f.
+  grading — accepts both the rounded and truncated form (0.143 and 0.142 for 1/7).
+- **Fermi estimation mode** — see the modes table; its buckets live outside the
+  exact-graded universe entirely.
+- **Within-bucket adaptive difficulty** — operand ceilings anneal toward your
+  edge (fast-and-right +0.02, miss −0.03, slow-but-right −0.01, clamped to the
+  class range). Snapshotted into the share URL like the weights, so replays stay
+  byte-identical; Zetamac-parity buckets never anneal. Landed as schema v2 via
+  the migration chain.
+- **Audio feedback** — WebAudio tick/buzz, zero assets. The Optiver sim plays a
+  verdict-blind click instead: the real test gives no feedback, so the sound
+  must not leak one. Mute toggle in Settings.
+- **Full per-question history** in IndexedDB with long-horizon analytics:
+  all-time totals and per-bucket weekly mean-time trends, plus a full-history
+  JSON export. Best-effort by design — IDB being unavailable degrades to a
+  note, never an error.
+
+The codec's bucket universe is append-only (pinned by test), so challenge
+links minted before these features decode unchanged — and old links without
+the difficulty param replay at full class ranges, exactly as they originally ran.
 
 ## Develop
 
