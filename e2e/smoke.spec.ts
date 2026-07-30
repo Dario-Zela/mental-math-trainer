@@ -1,0 +1,104 @@
+import { test, expect, type Page } from '@playwright/test';
+import AxeBuilder from '@axe-core/playwright';
+
+/**
+ * Smoke: one full keyboard-only session, localStorage persistence across
+ * reload, and an axe scan of the three screens.
+ *
+ * The drill session runs off a challenge URL (10s, Zetamac ranges, pinned
+ * seed) so the test finishes fast and deterministically — it exercises the
+ * exact code path a shared link uses.
+ */
+const CHALLENGE = '#/drill?m=z&s=0000002a&b=7800000&t=10&w=0000';
+
+function solve(prompt: string): number {
+  const norm = prompt.replace('−', '-').replace('×', '*').replace('÷', '/');
+  const m = norm.match(/^(\d+) ([-+*/]) (\d+)$/);
+  if (!m) throw new Error(`unparseable prompt: ${prompt}`);
+  const a = Number(m[1]);
+  const b = Number(m[3]);
+  switch (m[2]) {
+    case '+': return a + b;
+    case '-': return a - b;
+    case '*': return a * b;
+    default: return a / b;
+  }
+}
+
+async function runChallengeSession(page: Page): Promise<void> {
+  await page.goto(`/mental-math-trainer/${CHALLENGE}`);
+  await expect(page.locator('.prompt')).toBeVisible();
+  const deadline = Date.now() + 20_000;
+  while (Date.now() < deadline) {
+    if (await page.locator('.results').isVisible().catch(() => false)) return;
+    const prompt = (await page.locator('.prompt').textContent().catch(() => '')) ?? '';
+    const text = prompt.trim();
+    if (text.length === 0) continue;
+    await page.keyboard.type(String(solve(text)), { delay: 20 });
+    await page.waitForTimeout(60); // let auto-advance commit the next question
+  }
+  throw new Error('session never reached the results screen');
+}
+
+test('a full keyboard-only session: auto-advance, results, review pass', async ({ page }) => {
+  await runChallengeSession(page);
+
+  // scored at least a point and the summary grid rendered
+  const score = Number(await page.locator('.results .score').textContent());
+  expect(score).toBeGreaterThan(0);
+  await expect(page.getByText('replay — no PBs or streaks')).toBeVisible();
+
+  // review pass, driven by keyboard
+  await page.keyboard.press('r');
+  await expect(page.getByText(/Review pass · 1 \//)).toBeVisible();
+  await page.keyboard.press('ArrowRight');
+  await expect(page.getByText(/Review pass · 2 \//)).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.results .score')).toBeVisible();
+});
+
+test('stats persist in localStorage across reload', async ({ page }) => {
+  await runChallengeSession(page);
+  await page.keyboard.press('Escape'); // results → home
+  await page.goto('/mental-math-trainer/#/stats');
+  await expect(page.locator('.sessions-table tbody tr')).toHaveCount(1);
+  await page.reload();
+  await expect(page.locator('.sessions-table tbody tr')).toHaveCount(1);
+  await expect(page.locator('.sessions-table .tag').filter({ hasText: 'replay' })).toBeVisible();
+});
+
+test('keyboard launch from home starts the benchmark sprint', async ({ page }) => {
+  await page.goto('/mental-math-trainer/');
+  await page.keyboard.press('1');
+  await expect(page.locator('.prompt')).toBeVisible();
+  await expect(page.locator('.drill-status')).toContainText('Score');
+  // Esc aborts with confirm and discards
+  page.on('dialog', (d) => void d.accept());
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.hero')).toBeVisible();
+});
+
+test.describe('accessibility', () => {
+  const scan = async (page: Page) => {
+    const results = await new AxeBuilder({ page }).analyze();
+    const serious = results.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical');
+    expect(serious.map((v) => `${v.id}: ${v.nodes.length} nodes`)).toEqual([]);
+  };
+
+  test('home screen has no serious axe violations', async ({ page }) => {
+    await page.goto('/mental-math-trainer/');
+    await scan(page);
+  });
+
+  test('stats screen (with demo data) has no serious axe violations', async ({ page }) => {
+    await page.goto('/mental-math-trainer/#/stats');
+    await page.getByRole('button', { name: 'Load demo data' }).click();
+    await expect(page.locator('.heatmap')).toBeVisible();
+    await scan(page);
+  });
+
+  test('settings screen has no serious axe violations', async ({ page }) => {
+    await page.goto('/mental-math-trainer/#/settings');
+    await scan(page);
+  });
+});

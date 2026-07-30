@@ -141,8 +141,8 @@ button, select, input[type='number'] { font: inherit; color: inherit; }
   width: 1.9rem; height: 1.9rem; display: grid; place-items: center;
 }
 .mode-row:hover .key { border-color: var(--accent); color: var(--accent); }
-.mode-row .name { font-weight: 600; font-size: 1.02rem; }
-.mode-row .desc { color: var(--ink-dim); font-size: 0.86rem; margin-top: 0.1rem; }
+.mode-row .name { display: block; font-weight: 600; font-size: 1.02rem; }
+.mode-row .desc { display: block; color: var(--ink-dim); font-size: 0.86rem; margin-top: 0.1rem; }
 .mode-row .meta { font-family: var(--font-num); font-size: 0.8rem; color: var(--ink-dim); text-align: right; }
 
 .focus-picker { display: flex; gap: 0.6rem; align-items: center; padding: 0.9rem 0.4rem 1.2rem; }
@@ -331,6 +331,34 @@ input[type='number'] {
 .calendar-strip { display: grid; grid-auto-flow: column; grid-template-rows: repeat(7, 0.72rem); gap: 2px; margin-top: 0.9rem; width: max-content; }
 .calendar-strip .day { width: 0.72rem; height: 0.72rem; border-radius: 2px; background: var(--heat-0); }
 .calendar-strip .day.active { background: var(--accent); }
+
+.chart-legend {
+  display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;
+  margin-top: 0.6rem; font-size: 0.8rem; color: var(--ink-dim);
+}
+.chart-legend .chip { display: inline-flex; align-items: center; gap: 0.4rem; }
+.swatch.line { width: 1.2rem; height: 0; border-top: 2px solid var(--accent); }
+.swatch.line.dashed { border-top: 1px dashed var(--ink-dim); }
+.swatch.line.faint { border-top: 1px solid var(--accent); opacity: 0.4; }
+.swatch.line.target { border-top: 1px dashed var(--bad); }
+.swatch.dot { width: 0.55rem; height: 0.55rem; border-radius: 50%; background: var(--accent); }
+.swatch.box { width: 0.7rem; height: 0.7rem; border-radius: 2px; }
+.swatch.box.accent { background: var(--accent); }
+.swatch.box.neutral { background: var(--ink-dim); opacity: 0.55; }
+
+.heatmap td.small-n { opacity: 0.45; }
+
+.split-bars { margin-top: 0.4rem; }
+.split-row {
+  display: grid; grid-template-columns: minmax(9rem, 14rem) 1fr 3.5rem;
+  gap: 0.8rem; align-items: center; padding: 0.28rem 0; font-size: 0.85rem;
+}
+.split-label { color: var(--ink-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.split-bar { display: flex; gap: 2px; height: 0.85rem; }
+.split-bar .seg { border-radius: 3px; min-width: 2px; }
+.split-bar .seg.think { background: var(--accent); }
+.split-bar .seg.type { background: var(--ink-dim); opacity: 0.55; }
+.split-ms { text-align: right; font-size: 0.8rem; }
 
 @media (prefers-reduced-motion: reduce) {
   .entry .caret { animation: none; }
