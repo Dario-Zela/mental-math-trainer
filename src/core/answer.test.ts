@@ -59,6 +59,46 @@ describe('answer equivalence', () => {
   });
 });
 
+describe('tolerance grading (stretch buckets only)', () => {
+  it('sig3: correct to 3 significant figures, rounded or truncated', () => {
+    const third = rat(1, 3);   // 0.333333…
+    expect(matches('0.333', third, 'sig3')).toBe(true);
+    expect(matches('.3333', third, 'sig3')).toBe(true);
+    expect(matches('0.334', third, 'sig3')).toBe(true);  // one unit in the 3rd s.f.
+    expect(matches('0.33', third, 'sig3')).toBe(false);  // only 2 s.f. of precision
+    expect(matches('0.3', third, 'sig3')).toBe(false);
+    expect(matches('0.335', third, 'sig3')).toBe(false);
+    expect(matches('1/3', third, 'sig3')).toBe(true);    // exact always passes
+
+    const seventh = rat(1, 7); // 0.142857…
+    expect(matches('0.143', seventh, 'sig3')).toBe(true);  // rounded
+    expect(matches('0.142', seventh, 'sig3')).toBe(true);  // truncated
+    expect(matches('0.1429', seventh, 'sig3')).toBe(true);
+    expect(matches('0.14', seventh, 'sig3')).toBe(false);
+    expect(matches('0.144', seventh, 'sig3')).toBe(false);
+  });
+
+  it('rel5: within ±5 percent relative error', () => {
+    const answer = rat(48_213 * 677); // 32,640,201
+    expect(matches('32640201', answer, 'rel5')).toBe(true);
+    expect(matches('32000000', answer, 'rel5')).toBe(true);
+    expect(matches('31100000', answer, 'rel5')).toBe(true);  // −4.7%
+    expect(matches('34200000', answer, 'rel5')).toBe(true);  // +4.8%
+    expect(matches('30000000', answer, 'rel5')).toBe(false); // −8.1%
+    expect(matches('36000000', answer, 'rel5')).toBe(false);
+    expect(matches('3260000', answer, 'rel5')).toBe(false);  // off by 10×
+    // non-integer true values (fermi division) accept decimals
+    expect(matches('19519', rat(8_412_347, 431), 'rel5')).toBe(true);
+    expect(matches('19519.4', rat(8_412_347, 431), 'rel5')).toBe(true);
+    expect(matches('18000', rat(8_412_347, 431), 'rel5')).toBe(false);
+  });
+
+  it('exact grading is unaffected: near-misses still reject', () => {
+    expect(matches('0.333', rat(1, 3))).toBe(false);
+    expect(matches('32000000', rat(32_640_201))).toBe(false);
+  });
+});
+
 describe('keystroke filter', () => {
   it('builds valid prefixes and rejects everything else', () => {
     expect(applyKey('', '-')).toBe('-');

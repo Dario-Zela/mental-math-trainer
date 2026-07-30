@@ -2,12 +2,12 @@ import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
 import { mulberry32 } from './rng';
 import {
-  ALL_BUCKETS, ZETA_BUCKETS, generateQuestion, bucketOp,
-  MINUS, TIMES, DIVIDE, ARROW, RECIP_SET, type QuestionSpec,
+  ALL_BUCKETS, ZETA_BUCKETS, FERMI_BUCKETS, CODEC_BUCKETS, generateQuestion, bucketOp,
+  MINUS, TIMES, DIVIDE, ARROW, RECIP_SET, RECIP_REP_SET, type QuestionSpec,
 } from './questions';
 import { type Rational, rat, ratAdd, ratSub, ratMul, ratDiv, ratEq, isInteger, isTerminating, decimalPlaces } from './rational';
 
-const EVERY_BUCKET = [...ALL_BUCKETS, ...ZETA_BUCKETS];
+const EVERY_BUCKET = [...ALL_BUCKETS, ...ZETA_BUCKETS, ...FERMI_BUCKETS];
 
 /**
  * Independent evaluator: parse the prompt string back into an expression and
@@ -15,6 +15,14 @@ const EVERY_BUCKET = [...ALL_BUCKETS, ...ZETA_BUCKETS];
  * generators — a shared bug can't cancel itself out.
  */
 function evalPrompt(spec: QuestionSpec): Rational {
+  // strip thousands-group commas (fermi prompts) without touching the
+  // list comma in "240 → 252, % change"
+  let p0 = spec.prompt;
+  for (let prev = ''; prev !== p0; ) {
+    prev = p0;
+    p0 = p0.replace(/(\d),(\d{3})/g, '$1$2');
+  }
+  spec = { ...spec, prompt: p0 };
   const num = (s: string): Rational => {
     if (s.includes('/')) {
       const [n, d] = s.split('/');
@@ -68,14 +76,37 @@ describe('generators', () => {
     );
   });
 
-  it('every answer satisfies the representability invariant (no tolerance grading anywhere)', () => {
+  it('every exactly-graded answer satisfies the representability invariant', () => {
+    // fermi is exempt by design: it grades at ±5% relative error, so its
+    // answers are never typed exactly and need not be exactly typeable.
     fc.assert(
-      fc.property(seedArb, fc.constantFrom(...EVERY_BUCKET), (seed, bucket) => {
+      fc.property(seedArb, fc.constantFrom(...EVERY_BUCKET.filter((b) => !b.startsWith('fermi:'))), (seed, bucket) => {
         const q = generateQuestion(bucket, mulberry32(seed), 0);
         expect(isRepresentable(q.answer)).toBe(true);
       }),
       { numRuns: 2000 },
     );
+  });
+
+  it('grading mode follows the bucket: exact everywhere except recip:rep (sig3) and fermi (rel5)', () => {
+    fc.assert(
+      fc.property(seedArb, fc.constantFrom(...EVERY_BUCKET), (seed, bucket) => {
+        const q = generateQuestion(bucket, mulberry32(seed), 0);
+        const expected = bucket.startsWith('fermi:') ? 'rel5' : bucket === 'recip:rep' ? 'sig3' : 'exact';
+        expect(q.grading).toBe(expected);
+      }),
+      { numRuns: 500 },
+    );
+  });
+
+  it('codec bucket universe is append-only: v1 indices are pinned forever', () => {
+    // Challenge URLs index into CODEC_BUCKETS by bit position — these
+    // assertions failing means every shared link in the wild just broke.
+    expect(CODEC_BUCKETS.slice(23, 27)).toEqual([...ZETA_BUCKETS]);
+    expect(CODEC_BUCKETS[22]).toBe('recip:term');
+    expect(CODEC_BUCKETS.indexOf('recip:rep')).toBe(27);
+    for (const b of EVERY_BUCKET) expect(CODEC_BUCKETS).toContain(b);
+    expect(new Set(CODEC_BUCKETS).size).toBe(CODEC_BUCKETS.length);
   });
 
   it('div answers are integers, sub answers are never negative', () => {
@@ -129,14 +160,20 @@ describe('generators', () => {
     );
   });
 
-  it('recip draws only from the terminating set', () => {
+  it('recip classes draw from their own sets: term terminating, rep repeating', () => {
     fc.assert(
-      fc.property(seedArb, (seed) => {
-        const q = generateQuestion('recip:term', mulberry32(seed), 0);
+      fc.property(seedArb, fc.constantFrom('term', 'rep'), (seed, cls) => {
+        const q = generateQuestion(`recip:${cls}`, mulberry32(seed), 0);
         const n = parseInt(q.prompt.split('/')[1] as string, 10);
-        expect(RECIP_SET).toContain(n);
+        if (cls === 'term') {
+          expect(RECIP_SET).toContain(n);
+          expect(isTerminating(q.answer)).toBe(true);
+        } else {
+          expect(RECIP_REP_SET).toContain(n);
+          expect(isTerminating(q.answer)).toBe(false);
+        }
       }),
-      { numRuns: 200 },
+      { numRuns: 300 },
     );
   });
 

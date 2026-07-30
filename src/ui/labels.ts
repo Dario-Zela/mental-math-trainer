@@ -11,6 +11,7 @@ export const OP_LABELS: Record<Op, string> = {
   pct_of: 'Percent of',
   pct_change: 'Percent change',
   recip: 'Reciprocals',
+  fermi: 'Fermi ≈',
 };
 
 export const CLASS_LABELS: Record<string, string> = {
@@ -25,7 +26,11 @@ export const CLASS_LABELS: Record<string, string> = {
   clean: 'clean',
   ugly: 'ugly',
   term: 'terminating',
+  rep: 'repeating · 3 s.f.',
   zeta: 'Zetamac ranges',
+  mul: 'big ×',
+  div: 'big ÷',
+  pct: 'big %',
 };
 
 export function bucketLabel(bucketId: string): string {

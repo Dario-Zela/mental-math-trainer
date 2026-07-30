@@ -15,7 +15,16 @@ import { type Rational, rat, ratAdd, ratMul, ratToDecimalString } from './ration
 export type Op =
   | 'add' | 'sub' | 'mul' | 'div'
   | 'frac_add' | 'frac_mul'
-  | 'dec_mul' | 'pct_of' | 'pct_change' | 'recip';
+  | 'dec_mul' | 'pct_of' | 'pct_change' | 'recip'
+  | 'fermi';
+
+/**
+ * How an answer is graded. 'exact' is the v1 invariant (rational equality);
+ * the tolerance modes exist only for stretch buckets whose true answers are
+ * not exactly typeable: 'sig3' = correct to 3 significant figures (repeating
+ * reciprocals), 'rel5' = within ±5% relative error (Fermi estimation).
+ */
+export type Grading = 'exact' | 'sig3' | 'rel5';
 
 export interface QuestionSpec {
   op: Op;
@@ -24,6 +33,7 @@ export interface QuestionSpec {
   bucketId: string;
   prompt: string;
   answer: Rational;
+  grading: Grading;
   generatedAt: number;
 }
 
@@ -32,8 +42,12 @@ export const TIMES = '×'; // ×
 export const DIVIDE = '÷'; // ÷
 export const ARROW = '→'; // →
 
-/** Operand classes per op. `zeta` classes exist only inside Zetamac-parity mode. */
-export const OPERAND_CLASSES: Record<Op, string[]> = {
+/**
+ * Operand classes per op. `zeta` classes exist only inside Zetamac-parity
+ * mode; fermi has no entry here because its tolerance grading must never leak
+ * into exact-graded custom sprints — it lives in FERMI_BUCKETS and its own mode.
+ */
+export const OPERAND_CLASSES: Record<Exclude<Op, 'fermi'>, string[]> = {
   add: ['2d2d', '3d2d', '3d3d'],
   sub: ['2d2d', '3d2d', '3d3d'],
   mul: ['1x2', '2x2', '1x3'],
@@ -43,18 +57,38 @@ export const OPERAND_CLASSES: Record<Op, string[]> = {
   dec_mul: ['clean', 'ugly'],
   pct_of: ['clean', 'ugly'],
   pct_change: ['clean', 'ugly'],
-  recip: ['term'],
+  recip: ['term', 'rep'],
 };
 
 export const ZETA_BUCKETS = ['add:zeta', 'sub:zeta', 'mul:zeta', 'div:zeta'] as const;
+export const FERMI_BUCKETS = ['fermi:mul', 'fermi:div', 'fermi:pct'] as const;
 
-/** Every custom-drill bucket, in canonical order (the URL codec bitmask indexes into this). */
-export const ALL_BUCKETS: string[] = (Object.keys(OPERAND_CLASSES) as Op[]).flatMap((op) =>
+/** Every custom-drill bucket, in UI order. */
+export const ALL_BUCKETS: string[] = (Object.keys(OPERAND_CLASSES) as Exclude<Op, 'fermi'>[]).flatMap((op) =>
   OPERAND_CLASSES[op].map((c) => `${op}:${c}`),
 );
 
-/** Canonical bucket universe for encoding: custom buckets then zeta buckets. */
-export const CODEC_BUCKETS: string[] = [...ALL_BUCKETS, ...ZETA_BUCKETS];
+/**
+ * Canonical bucket universe for the URL codec bitmask. APPEND-ONLY and frozen:
+ * challenge links index into this by position, so reordering or inserting
+ * anywhere but the end silently breaks every link in the wild.
+ */
+export const CODEC_BUCKETS: string[] = [
+  'add:2d2d', 'add:3d2d', 'add:3d3d',
+  'sub:2d2d', 'sub:3d2d', 'sub:3d3d',
+  'mul:1x2', 'mul:2x2', 'mul:1x3',
+  'div:1x2', 'div:2x2', 'div:1x3',
+  'frac_add:small', 'frac_add:any',
+  'frac_mul:small', 'frac_mul:any',
+  'dec_mul:clean', 'dec_mul:ugly',
+  'pct_of:clean', 'pct_of:ugly',
+  'pct_change:clean', 'pct_change:ugly',
+  'recip:term',
+  'add:zeta', 'sub:zeta', 'mul:zeta', 'div:zeta',
+  // — v1 universe above this line; stretch buckets append below —
+  'recip:rep',
+  'fermi:mul', 'fermi:div', 'fermi:pct',
+];
 
 export function bucketOp(bucketId: string): Op {
   return bucketId.split(':')[0] as Op;
@@ -90,6 +124,8 @@ const CLEAN_DECIMALS: ReadonlyArray<[string, Rational]> = [
 ];
 
 export const RECIP_SET = [2, 4, 5, 8, 10, 16, 20, 25, 32, 40, 50] as const;
+/** Repeating-decimal reciprocals — graded to 3 significant figures, not exactly. */
+export const RECIP_REP_SET = [3, 6, 7, 9, 11, 12, 14, 15] as const;
 
 /** Bases whose percent-changes terminate at ≤ 2 dp: 100/a has ≤ 2 dp. */
 const PCT_CHANGE_UGLY_BASES = [4, 5, 8, 10, 16, 20, 25, 40, 50, 80, 100, 125, 200, 250, 400, 500] as const;
@@ -196,14 +232,49 @@ function genPctChange(cls: string, rng: Rng): { prompt: string; answer: Rational
   }
 }
 
-function genRecip(rng: Rng): { prompt: string; answer: Rational } {
-  const n = pick(rng, RECIP_SET);
+function genRecip(cls: string, rng: Rng): { prompt: string; answer: Rational } {
+  const n = cls === 'rep' ? pick(rng, RECIP_REP_SET) : pick(rng, RECIP_SET);
   return { prompt: `1/${n}`, answer: rat(1, n) };
+}
+
+/** Thousands separators for readability; the answer grammar never accepts them. */
+function group(n: number): string {
+  return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+}
+
+/**
+ * Fermi estimation: unwieldy numbers, graded at ±5% relative error. The only
+ * op family exempt from the §3 representability invariant — its answers are
+ * never typed exactly, so exact typeability is not required.
+ */
+function genFermi(cls: string, rng: Rng): { prompt: string; answer: Rational } {
+  if (cls === 'mul') {
+    const a = randInt(rng, 10_500, 98_999);
+    const b = randInt(rng, 105, 989);
+    return { prompt: `${group(a)} ${TIMES} ${group(b)}`, answer: rat(a * b) };
+  }
+  if (cls === 'div') {
+    const x = randInt(rng, 100_000, 9_999_999);
+    let y = randInt(rng, 103, 997);
+    if (y % 100 === 0) y += 3; // keep the divisor unfriendly
+    return { prompt: `${group(x)} ${DIVIDE} ${y}`, answer: rat(x, y) };
+  }
+  // pct: awkward percent of a 3-sig-fig base
+  let p = randInt(rng, 2, 96);
+  if (p % 5 === 0) p += 1;
+  const base = randInt(rng, 101, 989) * Math.pow(10, randInt(rng, 2, 4));
+  return { prompt: `${p}% of ${group(base)}`, answer: rat(p * base, 100) };
 }
 
 // ---------------------------------------------------------------------------
 // Entry point
 // ---------------------------------------------------------------------------
+
+export function gradingFor(bucketId: string): Grading {
+  if (bucketId.startsWith('fermi:')) return 'rel5';
+  if (bucketId === 'recip:rep') return 'sig3';
+  return 'exact';
+}
 
 function generateOnce(bucketId: string, rng: Rng, now: number): QuestionSpec {
   const op = bucketOp(bucketId);
@@ -216,10 +287,11 @@ function generateOnce(bucketId: string, rng: Rng, now: number): QuestionSpec {
     case 'dec_mul': q = genDecMul(cls, rng); break;
     case 'pct_of': q = genPctOf(cls, rng); break;
     case 'pct_change': q = genPctChange(cls, rng); break;
-    case 'recip': q = genRecip(rng); break;
+    case 'recip': q = genRecip(cls, rng); break;
+    case 'fermi': q = genFermi(cls, rng); break;
     default: throw new Error(`unknown op ${op satisfies never}`);
   }
-  return { op, operandClass: cls, bucketId, prompt: q.prompt, answer: q.answer, generatedAt: now };
+  return { op, operandClass: cls, bucketId, prompt: q.prompt, answer: q.answer, grading: gradingFor(bucketId), generatedAt: now };
 }
 
 /**

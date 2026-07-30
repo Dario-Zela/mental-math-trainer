@@ -195,7 +195,7 @@ export function Drill({ config, onExit, onRestart }: DrillProps) {
       setInput(next);
       // auto-advance: parse after every keystroke, fire the instant it matches.
       // Inherits Zetamac's prefix quirk (12 fires while typing 123) — deliberate.
-      if (rules.autoAdvance && matches(next, question.answer)) submit(next, e.timeStamp);
+      if (rules.autoAdvance && matches(next, question.answer, question.grading)) submit(next, e.timeStamp);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -261,7 +261,10 @@ export function Drill({ config, onExit, onRestart }: DrillProps) {
           <>
             <div className="prompt" aria-label={`Question: ${question?.prompt ?? ''}`}>
               {question?.prompt}
-              {question?.op === 'recip' && <span className="hint">as a decimal</span>}
+              {question?.op === 'recip' && (
+                <span className="hint">{question.grading === 'sig3' ? 'to 3 s.f.' : 'as a decimal'}</span>
+              )}
+              {question?.grading === 'rel5' && <span className="hint">within 5%</span>}
             </div>
             <div className="entry" aria-label="Your answer">
               {input}
@@ -446,9 +449,15 @@ function Review({ log, onBack }: { log: QuestionRecord[]; onBack(): void }) {
     return () => window.removeEventListener('keydown', onKey);
   }, [log.length, onBack]);
 
-  const canonical = r.spec.op.startsWith('frac')
-    ? ratToFractionString(r.spec.answer)
-    : ratToString(r.spec.answer);
+  const approx = (() => {
+    // tolerance-graded answers get a readable decimal alongside the exact form
+    const v = r.spec.answer.num / r.spec.answer.den;
+    if (r.spec.grading === 'sig3') return ` ≈ ${v.toPrecision(3)}`;
+    if (r.spec.grading === 'rel5' && r.spec.answer.den !== 1) return ` ≈ ${v.toPrecision(4)}`;
+    return '';
+  })();
+  const canonical =
+    (r.spec.op.startsWith('frac') ? ratToFractionString(r.spec.answer) : ratToString(r.spec.answer)) + approx;
 
   return (
     <div className="review">

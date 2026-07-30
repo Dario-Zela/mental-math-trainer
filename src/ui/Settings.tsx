@@ -56,7 +56,7 @@ export function Settings() {
       <section>
         <h3>Question types (custom sprint · Optiver sim)</h3>
         <div className="bucket-groups">
-          {(Object.keys(OPERAND_CLASSES) as Op[]).map((op) => (
+          {(Object.keys(OPERAND_CLASSES) as Exclude<Op, 'fermi'>[]).map((op) => (
             <div className="bucket-group" key={op}>
               <div className="op-name">{OP_LABELS[op]}</div>
               {OPERAND_CLASSES[op].map((cls) => {

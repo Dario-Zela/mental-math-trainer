@@ -175,7 +175,7 @@ function HeatCell({ id, stats }: { id: string; stats: BucketStats | undefined })
 }
 
 function Heatmap({ buckets }: { buckets: Record<string, BucketStats> }) {
-  const ops = Object.keys(OPERAND_CLASSES) as Op[];
+  const ops = Object.keys(OPERAND_CLASSES) as Exclude<Op, 'fermi'>[];
   const hasZeta = (op: Op) => ['add', 'sub', 'mul', 'div'].includes(op);
   return (
     // scrollable on narrow screens, so it must be keyboard-reachable

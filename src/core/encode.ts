@@ -12,13 +12,18 @@ import type { SessionConfig } from './session';
 const MODE_CODES: Record<Mode, string> = { zetamac: 'z', optiver: 'o', focus: 'f' };
 const CODE_MODES: Record<string, Mode> = { z: 'zetamac', o: 'optiver', f: 'focus' };
 
-/** Enabled buckets → hex bitmask over the canonical bucket universe. */
+/**
+ * Enabled buckets → hex bitmask over the canonical bucket universe.
+ * Arithmetic (2**i), never bitwise: JS bitwise ops truncate to 32 bits and the
+ * append-only universe already holds more than 31 buckets. Doubles are exact
+ * up to 2^53 — room for 53 buckets before this needs BigInt.
+ */
 export function encodeBuckets(buckets: readonly string[]): string {
   let mask = 0;
   for (const b of buckets) {
     const i = CODEC_BUCKETS.indexOf(b);
     if (i === -1) throw new Error(`unknown bucket ${b}`);
-    mask |= 1 << i;
+    mask += 2 ** i;
   }
   return mask.toString(16);
 }
@@ -26,10 +31,10 @@ export function encodeBuckets(buckets: readonly string[]): string {
 export function decodeBuckets(hex: string): string[] | null {
   if (!/^[0-9a-f]+$/.test(hex)) return null;
   const mask = parseInt(hex, 16);
-  if (!Number.isFinite(mask) || mask === 0 || mask >= 1 << CODEC_BUCKETS.length) return null;
+  if (!Number.isFinite(mask) || mask === 0 || mask >= 2 ** CODEC_BUCKETS.length) return null;
   const out: string[] = [];
   for (let i = 0; i < CODEC_BUCKETS.length; i++) {
-    if (mask & (1 << i)) out.push(CODEC_BUCKETS[i] as string);
+    if (Math.floor(mask / 2 ** i) % 2 === 1) out.push(CODEC_BUCKETS[i] as string);
   }
   return out;
 }

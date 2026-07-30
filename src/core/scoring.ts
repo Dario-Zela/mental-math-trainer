@@ -4,7 +4,8 @@
  * (auto-advance, hidden running score, pre-roll…), so mode differences live
  * here in the core, not scattered through components.
  */
-import { type Rational, ratEq } from './rational';
+import type { Rational } from './rational';
+import { answersMatch } from './answer';
 import type { QuestionSpec } from './questions';
 
 export type Mode = 'zetamac' | 'optiver' | 'focus';
@@ -53,7 +54,7 @@ export function makeScorer(mode: Mode, durationSec?: number | null): Scorer {
         onAnswer(spec, given) {
           // Auto-advance means the only submissions are correct ones; anything
           // else would be a UI bug, so grade defensively anyway.
-          const correct = given !== null && ratEq(given, spec.answer);
+          const correct = given !== null && answersMatch(given, spec.answer, spec.grading);
           return { verdict: correct ? 'correct' : 'wrong', delta: correct ? 1 : 0 };
         },
         isDone: (s) => s.elapsedMs >= (rules.durationMs as number),
@@ -69,7 +70,7 @@ export function makeScorer(mode: Mode, durationSec?: number | null): Scorer {
         rules,
         onAnswer(spec, given) {
           if (given === null) return { verdict: 'skip', delta: 0 };
-          const correct = ratEq(given, spec.answer);
+          const correct = answersMatch(given, spec.answer, spec.grading);
           return { verdict: correct ? 'correct' : 'wrong', delta: correct ? 1 : -1 };
         },
         isDone: (s) => s.elapsedMs >= (rules.durationMs as number) || s.answered >= OPTIVER_CAP,
@@ -85,7 +86,7 @@ export function makeScorer(mode: Mode, durationSec?: number | null): Scorer {
         rules,
         onAnswer(spec, given) {
           if (given === null) return { verdict: 'skip', delta: 0 };
-          const correct = ratEq(given, spec.answer);
+          const correct = answersMatch(given, spec.answer, spec.grading);
           return { verdict: correct ? 'correct' : 'wrong', delta: correct ? 1 : 0 };
         },
         isDone: () => false, // untimed — the user ends it
