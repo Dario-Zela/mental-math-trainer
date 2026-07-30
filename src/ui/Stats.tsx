@@ -7,6 +7,7 @@ import { FERMI_BUCKETS, OPERAND_CLASSES, type Op } from '../core/questions';
 import { weakness, type BucketStats } from '../core/buckets';
 import { WEAKNESS_MAX } from '../core/scheduler';
 import { importJSON } from '../store/persist';
+import { allTimeTotals, loadHistory, weeklyTrend, type HistoryRow, type WeekPoint } from '../store/history';
 import type { SessionSummary } from '../core/session';
 import demoData from './demo-data.json';
 
@@ -251,6 +252,114 @@ function SplitBars({ buckets }: { buckets: Record<string, BucketStats> }) {
 }
 
 /* ------------------------------------------------------------------ */
+/* long-horizon history (IndexedDB)                                   */
+/* ------------------------------------------------------------------ */
+
+function TrendChart({ points }: { points: WeekPoint[] }) {
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(800);
+
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setWidth(Math.max(320, el.clientWidth - 2)));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const accent = cssVar('--accent');
+    const dim = cssVar('--ink-dim');
+    const hairline = cssVar('--hairline');
+    const axis: uPlot.Axis = {
+      stroke: dim,
+      grid: { stroke: hairline, width: 1 },
+      ticks: { stroke: hairline, width: 1 },
+      font: '12px "Space Mono", monospace',
+    };
+    const plot = new uPlot(
+      {
+        width,
+        height: 180,
+        scales: { x: { time: true } },
+        series: [
+          {},
+          { label: 'mean s', stroke: accent, width: 2, points: { show: true, size: 5, fill: accent }, spanGaps: true },
+        ],
+        axes: [{ ...axis }, { ...axis }],
+        legend: { show: false },
+        cursor: { points: { size: 8 } },
+      },
+      [
+        points.map((p) => Date.parse(`${p.weekStart}T00:00:00Z`) / 1000),
+        points.map((p) => (p.meanMs === null ? null : p.meanMs / 1000)),
+      ],
+      el,
+    );
+    return () => plot.destroy();
+  }, [points, width]);
+
+  return <div ref={wrapRef} className="chart-box" role="img" tabIndex={0} aria-label="Weekly mean answer time trend" />;
+}
+
+function History() {
+  const [rows, setRows] = useState<HistoryRow[] | null | 'loading'>('loading');
+  const [bucket, setBucket] = useState<string>('');
+
+  useEffect(() => {
+    void loadHistory().then((r) => {
+      setRows(r);
+      const first = r?.find((row) => row.bucketId)?.bucketId;
+      if (first) setBucket((b) => b || first);
+    });
+  }, []);
+
+  if (rows === 'loading') return <p className="micro" style={{ marginTop: '0.8rem' }}>Loading history…</p>;
+  if (rows === null) {
+    return (
+      <p className="micro" style={{ marginTop: '0.8rem' }}>
+        History unavailable — IndexedDB is blocked (private browsing?). Session summaries above are unaffected.
+      </p>
+    );
+  }
+  if (rows.length === 0) {
+    return (
+      <p className="micro" style={{ marginTop: '0.8rem' }}>
+        Per-question history accumulates from your next completed session (demo data doesn't include it).
+      </p>
+    );
+  }
+
+  const totals = allTimeTotals(rows);
+  const buckets = [...new Set(rows.map((r) => r.bucketId))].sort();
+  const trend = bucket ? weeklyTrend(rows, bucket) : [];
+
+  return (
+    <>
+      <div className="result-grid" style={{ marginTop: '0.9rem' }}>
+        <div className="cell"><span className="micro">Questions all-time</span><span className="num">{totals.questions}</span></div>
+        <div className="cell"><span className="micro">Accuracy</span><span className="num">{Math.round(totals.accuracy * 100)}%</span></div>
+        <div className="cell">
+          <span className="micro">Time answering</span>
+          <span className="num">{totals.hours < 1 ? `${Math.round(totals.hours * 60)}m` : `${totals.hours.toFixed(1)}h`}</span>
+        </div>
+      </div>
+      <div className="field-row">
+        <label className="micro" htmlFor="trend-bucket">Weekly trend for</label>
+        <select id="trend-bucket" value={bucket} onChange={(e) => setBucket(e.target.value)}>
+          {buckets.map((b) => <option key={b} value={b}>{bucketLabel(b)}</option>)}
+        </select>
+      </div>
+      {trend.length >= 2
+        ? <TrendChart points={trend} />
+        : <p className="micro" style={{ marginTop: '0.6rem' }}>The trend line appears after two weeks of data on this type.</p>}
+    </>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /* calendar strip                                                     */
 /* ------------------------------------------------------------------ */
 
@@ -364,6 +473,11 @@ export function Stats() {
       <section>
         <h3>Where the seconds go — think vs type</h3>
         <SplitBars buckets={store.buckets} />
+      </section>
+
+      <section>
+        <h3>Long-horizon history</h3>
+        <History />
       </section>
 
       <section>

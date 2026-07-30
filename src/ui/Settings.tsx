@@ -3,6 +3,7 @@ import { useStore } from './storeContext';
 import { CLASS_LABELS, OP_LABELS } from './labels';
 import { OPERAND_CLASSES, type Op } from '../core/questions';
 import { exportJSON, importJSON, saveStore } from '../store/persist';
+import { exportHistoryJSON, loadHistory } from '../store/history';
 import { freshStore } from '../store/schema';
 
 export function Settings() {
@@ -21,13 +22,26 @@ export function Settings() {
     });
   };
 
-  const download = () => {
-    const blob = new Blob([exportJSON(store)], { type: 'application/json' });
+  const downloadBlob = (content: string, name: string) => {
+    const blob = new Blob([content], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `mental-math-trainer-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = name;
     a.click();
     URL.revokeObjectURL(a.href);
+  };
+
+  const download = () => {
+    downloadBlob(exportJSON(store), `mental-math-trainer-${new Date().toISOString().slice(0, 10)}.json`);
+  };
+
+  const downloadHistory = async () => {
+    const rows = await loadHistory();
+    if (rows === null || rows.length === 0) {
+      setImportMsg(rows === null ? 'History unavailable (IndexedDB blocked).' : 'No per-question history yet.');
+      return;
+    }
+    downloadBlob(exportHistoryJSON(rows), `mental-math-trainer-history-${new Date().toISOString().slice(0, 10)}.json`);
   };
 
   const onImportFile = async (file: File) => {
@@ -134,6 +148,7 @@ export function Settings() {
         <h3>Data</h3>
         <div className="field-row">
           <button type="button" className="btn" onClick={download}>Export JSON</button>
+          <button type="button" className="btn" onClick={() => void downloadHistory()}>Export full history</button>
           <button type="button" className="btn" onClick={() => fileRef.current?.click()}>Import JSON</button>
           <input
             ref={fileRef}

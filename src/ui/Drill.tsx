@@ -4,6 +4,7 @@ import { bucketLabel, fmtClock, fmtMs, todayLocal } from './labels';
 import { Session, makeConfig, type QuestionRecord, type SessionConfig, type SessionSummary } from '../core/session';
 import { applyKey, matches, parseAnswer } from '../core/answer';
 import { applySession } from '../store/persist';
+import { appendHistory, historyRows } from '../store/history';
 import { sounds } from './audio';
 import { encodeSession } from '../core/encode';
 import { randomSeed } from '../core/rng';
@@ -108,6 +109,8 @@ export function Drill({ config, onExit, onRestart }: DrillProps) {
     // applySession is pure; compute once against the current store and commit.
     const r = applySession(store, summary, session.log, session.bucketStats(), todayLocal());
     update(() => r.store);
+    // long-horizon history is best-effort and must never delay the results screen
+    void appendHistory(historyRows(summary, session.log));
     setApplied({ summary, log: session.log, pbBefore, newPB: r.newPB, nudge: r.nudge });
     setPhase('done');
   }, [session, store, update, onExit]);

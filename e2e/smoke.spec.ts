@@ -57,7 +57,7 @@ test('a full keyboard-only session: auto-advance, results, review pass', async (
   await expect(page.locator('.results .score')).toBeVisible();
 });
 
-test('stats persist in localStorage across reload', async ({ page }) => {
+test('stats persist in localStorage across reload; IDB history accumulates', async ({ page }) => {
   await runChallengeSession(page);
   await page.keyboard.press('Escape'); // results → home
   await page.goto('/mental-math-trainer/#/stats');
@@ -65,6 +65,10 @@ test('stats persist in localStorage across reload', async ({ page }) => {
   await page.reload();
   await expect(page.locator('.sessions-table tbody tr')).toHaveCount(1);
   await expect(page.locator('.sessions-table .tag').filter({ hasText: 'replay' })).toBeVisible();
+  // the per-question log landed in IndexedDB: all-time totals render non-zero
+  await expect(page.getByText('Questions all-time')).toBeVisible();
+  const count = Number(await page.locator('.result-grid .cell').first().locator('.num').textContent());
+  expect(count).toBeGreaterThan(0);
 });
 
 test('keyboard launch from home starts the benchmark sprint', async ({ page }) => {
