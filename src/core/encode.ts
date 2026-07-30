@@ -47,6 +47,7 @@ export function encodeSession(config: SessionConfig): string {
   p.set('b', encodeBuckets(config.buckets));
   if (config.durationSec !== null) p.set('t', String(config.durationSec));
   p.set('w', config.weights.map((w) => w.toString(16)).join(''));
+  p.set('d', config.difficulties.map((d) => d.toString(16)).join(''));
   return p.toString();
 }
 
@@ -80,6 +81,12 @@ export function decodeSession(query: string): SessionConfig | null {
     ? [...wRaw].map((c) => parseInt(c, 16))
     : buckets.map(() => 0); // tolerate missing/mismatched weights: uniform replay
 
+  const dRaw = p.get('d') ?? '';
+  if (!/^[0-9a-f]*$/.test(dRaw)) return null;
+  const difficulties = dRaw.length === buckets.length
+    ? [...dRaw].map((c) => parseInt(c, 16))
+    : buckets.map(() => 15); // pre-anneal links replay at full class ranges — byte-identical
+
   // Opened from a URL ⇒ replay: buckets update normally, PBs/streaks don't.
-  return { mode, seed, buckets, weights, durationSec, replay: true };
+  return { mode, seed, buckets, weights, difficulties, durationSec, replay: true };
 }

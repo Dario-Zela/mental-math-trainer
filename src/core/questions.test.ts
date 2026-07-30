@@ -198,6 +198,32 @@ describe('generators', () => {
     );
   });
 
+  it('difficulty anneals operand ceilings within the class; zeta ignores it', () => {
+    fc.assert(
+      fc.property(seedArb, (seed) => {
+        // mul:2x2 at difficulty 0: both operands confined to the bottom 40% of 10..99
+        const easy = generateQuestion('mul:2x2', mulberry32(seed), 0, [], 0);
+        const [a, b] = easy.prompt.split(` ${TIMES} `).map(Number) as [number, number];
+        expect(a).toBeLessThanOrEqual(46);
+        expect(b).toBeLessThanOrEqual(46);
+        // zeta parity never anneals: full 2..100 range stays reachable
+        const zeta = generateQuestion('mul:zeta', mulberry32(seed), 0, [], 0);
+        const ops = zeta.prompt.split(` ${TIMES} `).map(Number) as [number, number];
+        expect(Math.max(...ops)).toBeLessThanOrEqual(100);
+      }),
+      { numRuns: 500 },
+    );
+    // and at difficulty 0 the zeta range is still the FULL range: over many
+    // draws something above the annealed ceiling must appear
+    const rng = mulberry32(7);
+    const seen: number[] = [];
+    for (let i = 0; i < 200; i++) {
+      const q = generateQuestion('mul:zeta', rng, 0, [], 0);
+      seen.push(...(q.prompt.split(` ${TIMES} `).map(Number) as number[]));
+    }
+    expect(Math.max(...seen)).toBeGreaterThan(61); // annealed ceiling would be 2+round(98·0.4)=41
+  });
+
   it('the ring buffer suppresses exact repeats', () => {
     const rng = mulberry32(42);
     const recent: string[] = [];

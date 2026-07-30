@@ -47,8 +47,8 @@ describe('scheduler', () => {
   it('raising a bucket\'s errRate strictly raises its sampling share', () => {
     const mk = (errRate: number): Record<string, BucketStats> => {
       const stats: Record<string, BucketStats> = {};
-      for (const b of BUCKETS) stats[b] = { attempts: 20, errRate: 0.1, meanMs: 2000, meanFirstKeyMs: 800 };
-      stats[BUCKETS[1] as string] = { attempts: 20, errRate, meanMs: 2000, meanFirstKeyMs: 800 };
+      for (const b of BUCKETS) stats[b] = { attempts: 20, errRate: 0.1, meanMs: 2000, meanFirstKeyMs: 800, difficulty: 0.5 };
+      stats[BUCKETS[1] as string] = { attempts: 20, errRate, meanMs: 2000, meanFirstKeyMs: 800, difficulty: 0.5 };
       return stats;
     };
     const low = draw(snapshotWeights(BUCKETS, mk(0.2)), 10_000);
@@ -58,7 +58,7 @@ describe('scheduler', () => {
 
   it('slow-but-right counts as weak: high meanMs raises share with zero errors', () => {
     const stats: Record<string, BucketStats> = {};
-    for (const b of BUCKETS) stats[b] = { attempts: 20, errRate: 0, meanMs: 2000, meanFirstKeyMs: 800 };
+    for (const b of BUCKETS) stats[b] = { attempts: 20, errRate: 0, meanMs: 2000, meanFirstKeyMs: 800, difficulty: 0.5 };
     (stats['mul:2x2'] as BucketStats).meanMs = 18_000; // target 9000 ⇒ slowness term saturates
     const freq = draw(snapshotWeights(BUCKETS, stats), 10_000);
     expect((freq['mul:2x2'] as number) / 10_000).toBeGreaterThan(0.3);

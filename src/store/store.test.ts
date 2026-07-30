@@ -39,7 +39,7 @@ describe('persistence', () => {
     fc.assert(
       fc.property(fc.string(), (junk) => {
         const store = loadStore(fakeStorage({ [STORE_KEY]: junk }));
-        expect(store.version).toBe(1);
+        expect(store.version).toBe(2);
         expect(Array.isArray(store.sessions)).toBe(true);
         expect(store.settings.enabledBuckets.length).toBeGreaterThan(0);
       }),
@@ -52,7 +52,7 @@ describe('persistence', () => {
     fc.assert(
       fc.property(anyJson, (value) => {
         expect(() => migrate(value)).not.toThrow();
-        expect(migrate(value).version).toBe(1);
+        expect(migrate(value).version).toBe(2);
       }),
       { numRuns: 300 },
     );
@@ -66,6 +66,25 @@ describe('persistence', () => {
     expect(restored.pbs.optiver).toBe(55);
     expect(restored.streak).toEqual(freshStore().streak);
     expect(restored.sessions).toHaveLength(1); // the invalid row is dropped, the valid one kept
+  });
+
+  it('v1 stores migrate to v2: difficulty and sound gain their defaults', () => {
+    const v2 = freshStore();
+    const v1: Record<string, unknown> = {
+      ...v2,
+      version: 1,
+      settings: { enabledBuckets: v2.settings.enabledBuckets, mode: v2.settings.mode, targetScore: 55 },
+      buckets: { 'mul:2x2': { attempts: 12, errRate: 0.2, meanMs: 8000, meanFirstKeyMs: 3000 } },
+      pbs: { zetamac: 47 },
+    };
+    const migrated = migrate(v1);
+    expect(migrated.version).toBe(2);
+    expect(migrated.settings.sound).toBe(true);
+    expect(migrated.settings.targetScore).toBe(55);
+    expect(migrated.pbs.zetamac).toBe(47);
+    expect(migrated.buckets['mul:2x2']).toEqual({
+      attempts: 12, errRate: 0.2, meanMs: 8000, meanFirstKeyMs: 3000, difficulty: 0.5,
+    });
   });
 
   it('unknown versions (past or future) yield a fresh store', () => {
@@ -86,7 +105,7 @@ describe('applySession', () => {
   const day = '2026-07-30';
 
   it('appends the summary, replaces the log, merges bucket stats', () => {
-    const buckets = { 'add:zeta': { attempts: 45, errRate: 0.1, meanMs: 2100, meanFirstKeyMs: 800 } };
+    const buckets = { 'add:zeta': { attempts: 45, errRate: 0.1, meanMs: 2100, meanFirstKeyMs: 800, difficulty: 0.6 } };
     const { store } = applySession(freshStore(), summary(), [], buckets, day);
     expect(store.sessions).toHaveLength(1);
     expect(store.buckets['add:zeta']?.attempts).toBe(45);

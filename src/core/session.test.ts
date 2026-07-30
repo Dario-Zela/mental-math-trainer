@@ -3,7 +3,7 @@ import fc from 'fast-check';
 import { Session, makeConfig, isBenchmark, type SessionConfig } from './session';
 import { ZETA_BUCKETS, ALL_BUCKETS } from './questions';
 import { encodeSession, decodeSession } from './encode';
-import { freshBucket, type BucketStats } from './buckets';
+import { freshBucket, updateBucket, type BucketStats } from './buckets';
 import { type Rational, ratToDecimalString, isTerminating } from './rational';
 
 /** A correct answer in the input grammar: decimal when it terminates, fraction otherwise. */
@@ -58,6 +58,17 @@ describe('session scoring & weakness updates', () => {
     expect(b.errRate).toBe(0);
     expect(b.meanMs).toBe(3000);
     expect(b.meanFirstKeyMs).toBe(1200);
+    expect(b.difficulty).toBeCloseTo(0.52); // fast correct answer anneals upward
+  });
+
+  it('difficulty anneals: misses back off, slow-but-right drifts down, and it clamps', () => {
+    let b = freshBucket();
+    b = updateBucket(b, true, 5000, null, 'mul:2x2');
+    expect(b.difficulty).toBeCloseTo(0.47); // miss: −0.03
+    b = updateBucket(b, false, 20_000, null, 'mul:2x2');
+    expect(b.difficulty).toBeCloseTo(0.46); // correct but over the 9s target: −0.01
+    for (let i = 0; i < 60; i++) b = updateBucket(b, false, 1000, null, 'mul:2x2');
+    expect(b.difficulty).toBe(1); // clamped at the top
   });
 
   it('skips count as misses for errRate but never touch meanMs', () => {
@@ -143,14 +154,14 @@ describe('benchmark detection & weight snapshots', () => {
 
   it('zetamac-parity sessions sample ops uniformly even with skewed stats', () => {
     const skewed: Record<string, BucketStats> = {};
-    for (const b of ZETA_BUCKETS) skewed[b] = { attempts: 50, errRate: 0.9, meanMs: 15_000, meanFirstKeyMs: 5000 };
+    for (const b of ZETA_BUCKETS) skewed[b] = { attempts: 50, errRate: 0.9, meanMs: 15_000, meanFirstKeyMs: 5000, difficulty: 0.9 };
     expect(makeConfig('zetamac', [...ZETA_BUCKETS], skewed, 1, 120).weights).toEqual([0, 0, 0, 0]);
   });
 
   it('custom sessions snapshot weakness into the config', () => {
     const stats: Record<string, BucketStats> = {
-      'add:2d2d': { attempts: 50, errRate: 0.8, meanMs: 9000, meanFirstKeyMs: 2000 },
-      'mul:2x2': { attempts: 50, errRate: 0, meanMs: 4000, meanFirstKeyMs: 1500 },
+      'add:2d2d': { attempts: 50, errRate: 0.8, meanMs: 9000, meanFirstKeyMs: 2000, difficulty: 0.3 },
+      'mul:2x2': { attempts: 50, errRate: 0, meanMs: 4000, meanFirstKeyMs: 1500, difficulty: 0.8 },
     };
     const config = makeConfig('optiver', ['add:2d2d', 'mul:2x2'], stats, 1);
     expect(config.weights[0]).toBeGreaterThan(config.weights[1] as number);
@@ -159,6 +170,15 @@ describe('benchmark detection & weight snapshots', () => {
   it('cold-start stats produce an all-zero snapshot', () => {
     const stats = { 'add:2d2d': { ...freshBucket(), attempts: 2 } };
     expect(makeConfig('optiver', ['add:2d2d', 'mul:2x2'], stats, 1).weights).toEqual([0, 0]);
+  });
+
+  it('difficulty snapshots quantise per bucket; zeta and fermi are pinned to full range', () => {
+    const stats: Record<string, BucketStats> = {
+      'mul:2x2': { ...freshBucket(), attempts: 30, difficulty: 0.2 },
+      'mul:zeta': { ...freshBucket(), attempts: 30, difficulty: 0.2 },
+    };
+    const config = makeConfig('optiver', ['mul:2x2', 'mul:zeta', 'fermi:mul'], stats, 1);
+    expect(config.difficulties).toEqual([3, 15, 15]);
   });
 });
 
@@ -178,6 +198,7 @@ describe('URL codec', () => {
       return {
         mode, seed, buckets,
         weights: buckets.map((_, i) => (weightSeed + i) % 16),
+        difficulties: buckets.map((_, i) => (weightSeed * 3 + i) % 16),
         durationSec: mode === 'zetamac' ? durationSec : mode === 'optiver' ? 480 : null,
         replay: true,
       };

@@ -6,7 +6,7 @@
  */
 import { mulberry32, type Rng } from './rng';
 import { generateQuestion, type QuestionSpec, ZETA_BUCKETS } from './questions';
-import { type BucketStats, freshBucket, updateBucket } from './buckets';
+import { type BucketStats, freshBucket, updateBucket, DIFFICULTY_START } from './buckets';
 import { pickBucket, snapshotWeights } from './scheduler';
 import { makeScorer, type Mode, type Scorer, type Verdict, ZETAMAC_DEFAULT_SEC, OPTIVER_SEC } from './scoring';
 import { parseAnswer } from './answer';
@@ -18,6 +18,8 @@ export interface SessionConfig {
   buckets: string[];
   /** Quantised weakness snapshot aligned with `buckets` (0..15 each). */
   weights: number[];
+  /** Quantised difficulty snapshot aligned with `buckets` (0..15 each; 15 = full class range). */
+  difficulties: number[];
   /** Zetamac-style sessions only; optiver is fixed 480, focus untimed. */
   durationSec: number | null;
   /** Opened from a shared link → buckets update normally, PBs/streaks don't. */
@@ -47,6 +49,12 @@ export function makeConfig(
   return {
     mode, seed, buckets, durationSec: dur, replay: false,
     weights: snapshotWeights(buckets, stats, zetaParity),
+    // parity and fermi buckets never anneal: their ranges ARE the contract
+    difficulties: buckets.map((b) =>
+      b.endsWith(':zeta') || b.startsWith('fermi:')
+        ? 15
+        : Math.round((stats[b]?.difficulty ?? DIFFICULTY_START) * 15),
+    ),
   };
 }
 
@@ -112,7 +120,8 @@ export class Session {
   /** Draw the next question. Deterministic given (seed, config). */
   next(now = 0): QuestionSpec {
     const bucket = pickBucket(this.rng, this.config.buckets, this.config.weights, this.counts, this.log.length);
-    const q = generateQuestion(bucket, this.rng, now, this.ring);
+    const difficulty = (this.config.difficulties[this.config.buckets.indexOf(bucket)] ?? 15) / 15;
+    const q = generateQuestion(bucket, this.rng, now, this.ring, difficulty);
     this.ring.push(q.prompt);
     if (this.ring.length > RING_SIZE) this.ring.shift();
     this.counts[bucket] = (this.counts[bucket] ?? 0) + 1;
@@ -136,7 +145,7 @@ export class Session {
     const miss = verdict !== 'correct';
     const timeSignal = verdict === 'skip' ? null : ms;
     const firstKeySignal = verdict === 'skip' ? null : firstKeyMs;
-    this.stats[spec.bucketId] = updateBucket(this.stats[spec.bucketId] ?? freshBucket(), miss, timeSignal, firstKeySignal);
+    this.stats[spec.bucketId] = updateBucket(this.stats[spec.bucketId] ?? freshBucket(), miss, timeSignal, firstKeySignal, spec.bucketId);
     this.current = null;
     return { verdict, delta };
   }

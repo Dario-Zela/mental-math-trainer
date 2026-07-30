@@ -11,6 +11,13 @@ export interface BucketStats {
   meanMs: number;  // EWMA of answer ms (misses-by-skip excluded — no time to learn from)
   /** EWMA of prompt-paint → first keystroke; the think-time half of the think/typing split. */
   meanFirstKeyMs: number;
+  /**
+   * Within-bucket difficulty ∈ [0,1]: operand ranges anneal toward the user's
+   * edge (fast correct answers push it up, misses pull it down). Snapshotted
+   * into the session config like the weights, so replays stay byte-identical.
+   * Zetamac-parity and fermi buckets ignore it.
+   */
+  difficulty: number;
 }
 
 export const LAMBDA = 0.9; // EWMA decay
@@ -43,20 +50,29 @@ export function targetMs(bucketId: string): number {
   return TARGET_MS_BY_BUCKET[bucketId] ?? TARGET_MS_BY_OP[op] ?? 6000;
 }
 
+export const DIFFICULTY_START = 0.5;
+const DIFFICULTY_UP = 0.02;   // fast correct answer
+const DIFFICULTY_DOWN = 0.03; // miss
+const DIFFICULTY_DRIFT = 0.01; // correct but slower than target
+
 export function freshBucket(): BucketStats {
-  return { attempts: 0, errRate: 0, meanMs: 0, meanFirstKeyMs: 0 };
+  return { attempts: 0, errRate: 0, meanMs: 0, meanFirstKeyMs: 0, difficulty: DIFFICULTY_START };
 }
 
 /**
  * Record one attempt. `ms === null` means "no timing signal" — skips (there is
  * no answer time to learn from) and focus-loss-voided untimed questions.
  * The first timed attempt seeds the EWMAs directly instead of decaying from 0.
+ * `bucketId` (when given) drives the difficulty anneal: fast-and-right climbs
+ * toward harder operands, misses back off — asymmetric so the edge is
+ * approached from below.
  */
 export function updateBucket(
   s: BucketStats,
   miss: boolean,
   ms: number | null,
   firstKeyMs: number | null = null,
+  bucketId?: string,
 ): BucketStats {
   const errRate = s.attempts === 0 ? (miss ? 1 : 0) : LAMBDA * s.errRate + (1 - LAMBDA) * (miss ? 1 : 0);
   let meanMs = s.meanMs;
@@ -69,7 +85,15 @@ export function updateBucket(
     const clamped = Math.min(firstKeyMs, MS_CLAMP);
     meanFirstKeyMs = s.meanFirstKeyMs === 0 ? clamped : LAMBDA * s.meanFirstKeyMs + (1 - LAMBDA) * clamped;
   }
-  return { attempts: s.attempts + 1, errRate, meanMs, meanFirstKeyMs };
+  let difficulty = s.difficulty;
+  if (bucketId !== undefined) {
+    const step = miss ? -DIFFICULTY_DOWN
+      : ms !== null && ms <= targetMs(bucketId) ? DIFFICULTY_UP
+      : ms !== null ? -DIFFICULTY_DRIFT
+      : 0;
+    difficulty = Math.min(1, Math.max(0, difficulty + step));
+  }
+  return { attempts: s.attempts + 1, errRate, meanMs, meanFirstKeyMs, difficulty };
 }
 
 /**

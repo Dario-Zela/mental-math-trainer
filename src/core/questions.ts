@@ -130,11 +130,22 @@ export const RECIP_REP_SET = [3, 6, 7, 9, 11, 12, 14, 15] as const;
 /** Bases whose percent-changes terminate at ≤ 2 dp: 100/a has ≤ 2 dp. */
 const PCT_CHANGE_UGLY_BASES = [4, 5, 8, 10, 16, 20, 25, 40, 50, 80, 100, 125, 200, 250, 400, 500] as const;
 
-function genAddSub(op: 'add' | 'sub', cls: string, rng: Rng): { prompt: string; answer: Rational } {
+/**
+ * Difficulty anneal: shrink an operand range's ceiling toward its floor.
+ * d=1 is the full class range (also the exact pre-anneal behaviour, which is
+ * what URLs without a difficulty param decode to); d=0 keeps the bottom 40%.
+ * Never applied to zeta (parity) or fermi (its classes ARE the difficulty).
+ */
+function annealHi(lo: number, hi: number, d: number): number {
+  return lo + Math.round((hi - lo) * (0.4 + 0.6 * d));
+}
+
+function genAddSub(op: 'add' | 'sub', cls: string, rng: Rng, d: number): { prompt: string; answer: Rational } {
   const ranges = ADD_RANGES[cls];
   if (!ranges) throw new Error(`unknown ${op} class ${cls}`);
-  const a = randInt(rng, ranges[0][0], ranges[0][1]);
-  const b = randInt(rng, ranges[1][0], ranges[1][1]);
+  const anneal = cls === 'zeta' ? 1 : d;
+  const a = randInt(rng, ranges[0][0], annealHi(ranges[0][0], ranges[0][1], anneal));
+  const b = randInt(rng, ranges[1][0], annealHi(ranges[1][0], ranges[1][1], anneal));
   if (op === 'add') {
     // Randomise operand order so 3d2d isn't always big-first.
     const [x, y] = rng() < 0.5 ? [a, b] : [b, a];
@@ -145,11 +156,12 @@ function genAddSub(op: 'add' | 'sub', cls: string, rng: Rng): { prompt: string; 
   return { prompt: `${a + b} ${MINUS} ${minus}`, answer: rat(answer) };
 }
 
-function genMulDiv(op: 'mul' | 'div', cls: string, rng: Rng): { prompt: string; answer: Rational } {
+function genMulDiv(op: 'mul' | 'div', cls: string, rng: Rng, d: number): { prompt: string; answer: Rational } {
   const ranges = MUL_RANGES[cls];
   if (!ranges) throw new Error(`unknown ${op} class ${cls}`);
-  const a = randInt(rng, ranges[0][0], ranges[0][1]);
-  const b = randInt(rng, ranges[1][0], ranges[1][1]);
+  const anneal = cls === 'zeta' ? 1 : d;
+  const a = randInt(rng, ranges[0][0], annealHi(ranges[0][0], ranges[0][1], anneal));
+  const b = randInt(rng, ranges[1][0], annealHi(ranges[1][0], ranges[1][1], anneal));
   if (op === 'mul') {
     const [x, y] = rng() < 0.5 ? [a, b] : [b, a];
     return { prompt: `${x} ${TIMES} ${y}`, answer: rat(a * b) };
@@ -163,10 +175,11 @@ function lcm(a: number, b: number): number {
   return (a / g) * b;
 }
 
-function genFracOperands(cls: string, rng: Rng): [Rational, Rational] {
+function genFracOperands(cls: string, rng: Rng, d: number): [Rational, Rational] {
+  const denHi = annealHi(2, 12, d);
   for (;;) {
-    const d1 = randInt(rng, 2, 12);
-    const d2 = randInt(rng, 2, 12);
+    const d1 = randInt(rng, 2, denHi);
+    const d2 = randInt(rng, 2, denHi);
     if (cls === 'small' && lcm(d1, d2) > 24) continue;
     const n1 = randInt(rng, 1, d1 - 1);
     const n2 = randInt(rng, 1, d2 - 1);
@@ -178,8 +191,8 @@ function fracPromptPart(r: Rational): string {
   return `${r.num}/${r.den}`;
 }
 
-function genFrac(op: 'frac_add' | 'frac_mul', cls: string, rng: Rng): { prompt: string; answer: Rational } {
-  const [f1, f2] = genFracOperands(cls, rng);
+function genFrac(op: 'frac_add' | 'frac_mul', cls: string, rng: Rng, d: number): { prompt: string; answer: Rational } {
+  const [f1, f2] = genFracOperands(cls, rng, d);
   const sym = op === 'frac_add' ? '+' : TIMES;
   const answer = op === 'frac_add' ? ratAdd(f1, f2) : ratMul(f1, f2);
   return { prompt: `${fracPromptPart(f1)} ${sym} ${fracPromptPart(f2)}`, answer };
@@ -276,14 +289,14 @@ export function gradingFor(bucketId: string): Grading {
   return 'exact';
 }
 
-function generateOnce(bucketId: string, rng: Rng, now: number): QuestionSpec {
+function generateOnce(bucketId: string, rng: Rng, now: number, difficulty: number): QuestionSpec {
   const op = bucketOp(bucketId);
   const cls = bucketClass(bucketId);
   let q: { prompt: string; answer: Rational };
   switch (op) {
-    case 'add': case 'sub': q = genAddSub(op, cls, rng); break;
-    case 'mul': case 'div': q = genMulDiv(op, cls, rng); break;
-    case 'frac_add': case 'frac_mul': q = genFrac(op, cls, rng); break;
+    case 'add': case 'sub': q = genAddSub(op, cls, rng, difficulty); break;
+    case 'mul': case 'div': q = genMulDiv(op, cls, rng, difficulty); break;
+    case 'frac_add': case 'frac_mul': q = genFrac(op, cls, rng, difficulty); break;
     case 'dec_mul': q = genDecMul(cls, rng); break;
     case 'pct_of': q = genPctOf(cls, rng); break;
     case 'pct_change': q = genPctChange(cls, rng); break;
@@ -306,10 +319,11 @@ export function generateQuestion(
   rng: Rng,
   now: number,
   recentPrompts: readonly string[] = [],
+  difficulty = 1,
 ): QuestionSpec {
-  let q = generateOnce(bucketId, rng, now);
+  let q = generateOnce(bucketId, rng, now, difficulty);
   for (let i = 0; i < 500 && recentPrompts.includes(q.prompt); i++) {
-    q = generateOnce(bucketId, rng, now);
+    q = generateOnce(bucketId, rng, now, difficulty);
   }
   return q;
 }

@@ -108,20 +108,22 @@ for (const [b, target] of Object.entries(TARGETS)) {
     errRate: +(between(0.02, 0.08) + weak * 0.6).toFixed(3),
     meanMs: Math.round(target * between(0.75, 1.05) * (1 + weak)),
     meanFirstKeyMs: 0,
+    difficulty: +(between(0.55, 0.9) - weak).toFixed(2), // strong buckets have annealed upward
   };
   buckets[b].meanFirstKeyMs = Math.round(buckets[b].meanMs * between(0.5, 0.68));
 }
 // a couple of cold buckets so the heatmap's small-n desaturation shows
-buckets['frac_mul:any'] = { attempts: 6, errRate: 0.31, meanMs: 12400, meanFirstKeyMs: 8600 };
-buckets['add:3d3d'] = { attempts: 4, errRate: 0.12, meanMs: 5900, meanFirstKeyMs: 3400 };
+buckets['frac_mul:any'] = { attempts: 6, errRate: 0.31, meanMs: 12400, meanFirstKeyMs: 8600, difficulty: 0.42 };
+buckets['add:3d3d'] = { attempts: 4, errRate: 0.12, meanMs: 5900, meanFirstKeyMs: 3400, difficulty: 0.5 };
 
 const lastDay = new Date(sessions[sessions.length - 1].startedAt);
 const store = {
-  version: 1,
+  version: 2,
   settings: {
     enabledBuckets: CUSTOM.concat('add:2d2d', 'sub:2d2d', 'mul:1x2', 'pct_of:clean', 'recip:term'),
     mode: { mode: 'zetamac', durationSec: 120 },
     targetScore: 60,
+    sound: true,
   },
   buckets,
   sessions,

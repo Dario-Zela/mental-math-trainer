@@ -12,7 +12,7 @@ import type { Mode } from '../core/scoring';
 import type { QuestionRecord, SessionSummary } from '../core/session';
 import { ALL_BUCKETS } from '../core/questions';
 
-export const CURRENT_VERSION = 1;
+export const CURRENT_VERSION = 2;
 export const MAX_SESSIONS = 1000;
 
 export interface ModeConfig {
@@ -20,13 +20,15 @@ export interface ModeConfig {
   durationSec: number; // zetamac-style sessions; optiver/focus ignore it
 }
 
-export interface StoreV1 {
-  version: 1;
+export interface StoreV2 {
+  version: 2;
   settings: {
     enabledBuckets: string[];
     mode: ModeConfig;
     /** User-set target line on the stats chart (e.g. your Optiver goal score). */
     targetScore: number | null;
+    /** Audio feedback (WebAudio tick/buzz; a neutral click in sim mode). */
+    sound: boolean;
   };
   buckets: Record<string, BucketStats>;
   sessions: SessionSummary[];
@@ -38,15 +40,16 @@ export interface StoreV1 {
   sessionsSinceNudge: number;
 }
 
-export type Store = StoreV1;
+export type Store = StoreV2;
 
-export function freshStore(): StoreV1 {
+export function freshStore(): StoreV2 {
   return {
-    version: 1,
+    version: 2,
     settings: {
       enabledBuckets: [...ALL_BUCKETS],
       mode: { mode: 'zetamac', durationSec: 120 },
       targetScore: null,
+      sound: true,
     },
     buckets: {},
     sessions: [],
@@ -64,8 +67,13 @@ const isNum = (x: unknown): x is number => typeof x === 'number' && Number.isFin
 const isStr = (x: unknown): x is string => typeof x === 'string';
 const isObj = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null && !Array.isArray(x);
 
-function validBucketStats(x: unknown): x is BucketStats {
+function validBucketStats(x: unknown): x is Omit<BucketStats, 'difficulty'> {
   return isObj(x) && isNum(x.attempts) && isNum(x.errRate) && isNum(x.meanMs) && isNum(x.meanFirstKeyMs);
+}
+
+function normaliseBucket(x: Omit<BucketStats, 'difficulty'> & { difficulty?: unknown }): BucketStats {
+  const d = isNum(x.difficulty) ? Math.min(1, Math.max(0, x.difficulty)) : 0.5;
+  return { attempts: x.attempts, errRate: x.errRate, meanMs: x.meanMs, meanFirstKeyMs: x.meanFirstKeyMs, difficulty: d };
 }
 
 function validSummary(x: unknown): x is SessionSummary {
@@ -83,7 +91,7 @@ const MODES: Mode[] = ['zetamac', 'optiver', 'focus'];
  * Sanitise an untrusted parsed value into a valid store. Field-by-field: a
  * single bad field falls back to its default without discarding the rest.
  */
-function sanitise(raw: Record<string, unknown>): StoreV1 {
+function sanitise(raw: Record<string, unknown>): StoreV2 {
   const fresh = freshStore();
   const out = fresh;
 
@@ -100,10 +108,11 @@ function sanitise(raw: Record<string, unknown>): StoreV1 {
   if (isNum(settings.targetScore) || settings.targetScore === null) {
     out.settings.targetScore = settings.targetScore as number | null;
   }
+  if (typeof settings.sound === 'boolean') out.settings.sound = settings.sound;
 
   if (isObj(raw.buckets)) {
     for (const [k, v] of Object.entries(raw.buckets)) {
-      if (validBucketStats(v)) out.buckets[k] = v;
+      if (validBucketStats(v)) out.buckets[k] = normaliseBucket(v);
     }
   }
 
@@ -135,13 +144,17 @@ function sanitise(raw: Record<string, unknown>): StoreV1 {
 }
 
 /**
- * The migration chain: MIGRATIONS[n] upgrades version n → n+1. Empty while v1
- * is current; schema version bumps are explicit and land here.
+ * The migration chain: MIGRATIONS[n] upgrades version n → n+1. Schema version
+ * bumps are explicit and land here.
  */
-const MIGRATIONS: Record<number, (s: Record<string, unknown>) => Record<string, unknown>> = {};
+const MIGRATIONS: Record<number, (s: Record<string, unknown>) => Record<string, unknown>> = {
+  // v1 → v2: per-bucket adaptive difficulty + the sound setting. Defaults are
+  // filled by sanitise (difficulty 0.5, sound on); the bump just marks intent.
+  1: (s) => s,
+};
 
 /** Untrusted parsed JSON → valid current-version store. Never throws. */
-export function migrate(raw: unknown): StoreV1 {
+export function migrate(raw: unknown): StoreV2 {
   if (!isObj(raw) || !isNum(raw.version) || raw.version < 1 || raw.version > CURRENT_VERSION) {
     return freshStore();
   }
