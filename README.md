@@ -164,8 +164,9 @@ as "Custom".
   percentages — so that's exactly what the sim asks, uniformly sampled.
   Weakness-weighting and difficulty annealing are practice devices; they never
   touch an assessment.
-- PBs exist only for the benchmark sprint and the Optiver sim — custom-range
-  scores aren't comparable across configs.
+- PBs exist only for the fixed-configuration modes — the benchmark sprint, the
+  Optiver sim, and the Fermi sprint — because custom-range scores aren't
+  comparable across configs.
 - End-of-session results are announced via `aria-live`; per-question
   announcements would fight the drill pace.
 - No accounts, no sync, no backend — a backend would double the build for zero

@@ -95,7 +95,7 @@ export function Settings() {
       </section>
 
       <section>
-        <h3>Question types (custom sprint · Optiver sim)</h3>
+        <h3>Question types (custom sprint · focus drill)</h3>
         <div className="bucket-groups">
           {(Object.keys(OPERAND_CLASSES) as Exclude<Op, 'fermi'>[]).map((op) => (
             <div className="bucket-group" key={op}>
