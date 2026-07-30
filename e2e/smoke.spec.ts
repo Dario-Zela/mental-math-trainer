@@ -69,6 +69,10 @@ test('stats persist in localStorage across reload', async ({ page }) => {
 
 test('keyboard launch from home starts the benchmark sprint', async ({ page }) => {
   await page.goto('/mental-math-trainer/');
+  // the number-key listener attaches in an effect after first paint — wait for
+  // hydration before pressing, or the keystroke can vanish on slow CI runners
+  await expect(page.locator('.mode-row').first()).toBeVisible();
+  await page.waitForTimeout(150);
   await page.keyboard.press('1');
   await expect(page.locator('.prompt')).toBeVisible();
   await expect(page.locator('.drill-status')).toContainText('Score');
