@@ -1,0 +1,164 @@
+# mental×math
+
+**Live: <https://dario-zela.github.io/mental-math-trainer/>** — local-first, keyboard-only, no accounts.
+
+A mental-math trainer built for trading-interview prep. It drills what
+[Zetamac](https://arithmetic.zetamac.com/) doesn't — fractions, decimals,
+percentages, reciprocals — simulates the Optiver *80-in-8* under real test
+conditions, and schedules questions against the types you get wrong, not the
+questions you've seen.
+
+![The drill screen](docs/drill.png)
+
+## Training curve
+
+![Score over time](docs/training-curve.png)
+
+*Currently showing the bundled demo data (12 synthetic weeks) — the chart comes
+straight out of the app's PNG export, and this image gets replaced with my real
+curve as training progresses. The faint series is custom-range sessions, kept
+off the benchmark line so it stays honestly comparable to community Zetamac
+scores. Numbers from buckets with fewer than 10 attempts are never quoted —
+the heatmap desaturates them.*
+
+## Modes
+
+| Mode | Rules |
+|---|---|
+| **Zetamac sprint** | 120s, +1 per correct, auto-advance on the correct keystroke sequence — locked to Zetamac's default ranges so scores calibrate against community numbers. Custom ranges are allowed but labelled and plotted separately. |
+| **Optiver 80-in-8** | 8 minutes, 80 questions, +1/−1, explicit Enter, skip scores 0. A *simulation*, not just a scorer: 3-2-1 pre-roll, no per-question feedback, running score hidden until the end, focus losses recorded, Esc discards. A review pass afterwards steps through every question. |
+| **Focus drill** | Untimed, one question type, per-question millisecond timings — deliberate practice. |
+
+## The differentiating feature: weakness-driven scheduling
+
+The SRS unit is the **question type** (`op:operandClass` — e.g. `mul:2x2`), not
+the question instance. Memorising 47×83 is useless; being slow at 2×2
+multiplication is the signal.
+
+- Per bucket, exponentially-decayed records: `errRate ← 0.9·errRate + 0.1·miss`,
+  same for mean answer time.
+- Weakness `w = errRate + 0.5·clamp(meanMs/targetMs − 1, 0, 1)` — slow-but-right
+  still counts as weak. Targets are a hand-set table, deliberately not learned.
+- Sampling ∝ `(0.2 + w)²`, with a floor keeping every enabled bucket in rotation
+  and a 30%-per-session cap so your worst bucket can't become a demoralising
+  monoculture (which would also starve every other bucket's estimate of fresh data).
+- **No SM-2/Anki intervals.** Interval scheduling models day-scale forgetting;
+  drill sessions are minutes apart. Decayed error rates are the honest model here.
+- Skips count as misses but contribute no time signal — there's no answer time to
+  learn from, and skipping under +1/−1 rules is exactly the "can't do this fast"
+  signal the model wants.
+
+## Sessions are `(seed, config)` pairs
+
+Every session is a pure function of its seed and config, so any session is
+**replayable and shareable as a URL** — challenge links, bug repros and demo
+links all fall out of one codec for free (hash-routed, so static hosting needs
+no rewrite rules).
+
+The subtle part: the scheduler samples from *your* stats, which would make the
+same link produce different questions on your friend's machine. So the sampling
+weights are **snapshotted at session start, quantised to 4 bits each, and
+encoded into the config** — the receiver replays your exact session, weakness
+mix included. Cold start falls out naturally as an all-zero snapshot (uniform),
+and the Zetamac benchmark pins the snapshot to uniform, matching how Zetamac
+itself samples ops. Replays update your weakness model (the SRS unit is the
+type, not the instance) but are excluded from PBs and streaks.
+
+## Answers are exact rationals
+
+`0.375`, `.375`, `3/8` and `6/16` all match ⅜ by exact rational equality — no
+float comparison, no tolerance grading anywhere in v1. One generator invariant
+kills the entire "was 0.33 close enough?" class of design questions: every
+answer is an integer, a small fraction, or a terminating decimal.
+Unsimplified fractions are accepted deliberately — the skill being drilled is
+arithmetic, not simplification.
+
+The input grammar is frozen (`int | decimal | fraction`, filtered at keystroke
+level) and pinned down by a table of accept/reject test rows, not prose.
+Auto-advance inherits Zetamac's prefix quirk — answer 12 fires while you're
+typing 123 — kept deliberately, because that's what the benchmark does.
+
+## Honest timing
+
+- The per-question clock starts at prompt **paint** (`performance.now()` in a
+  rAF after the question commits), not at state change — render time is
+  excluded from your number.
+- First-keystroke and submit times come from `event.timeStamp`; the
+  think-time/typing-time split is usually the whole story of where seconds go
+  (see the stats screen).
+- Times are clamped at 20s before entering any average — one phone distraction
+  can't wreck a bucket. Focus losses void the timing of untimed questions; in
+  timed modes the wall clock keeps running, as in the real test.
+- The countdown derives from `performance.now()` deltas on a 100ms tick — no
+  accumulated `setInterval` drift across an 8-minute sim.
+- The hot input handler is wrapped in `performance.mark`; the measured maximum
+  is printed on every results screen (budget: 16ms — it measures ~1ms).
+
+## Architecture
+
+```
+src/
+├── core/     seeded RNG, generators, rational arithmetic, weakness model,
+│             scheduler, scorers, session machine, URL codec — pure TypeScript,
+│             zero DOM imports, fully unit/property-tested
+├── store/    versioned localStorage schema + migrations, export/import
+└── ui/       React (Vite) — components only; timing capture and keyboard
+              plumbing, no domain logic
+```
+
+The real design point: **the framework is replaceable because the core doesn't
+import it.** React is the thin shell; every rule in this README lives in `core/`
+and runs headless under vitest.
+
+Persistence is a single versioned localStorage blob with an explicit migration
+chain. Corrupt or fuzzed payloads always yield a working fresh store (property-
+tested), and every 10th session nudges an export — Safari can evict localStorage,
+so the worst case is bounded at "some stats", never the app (it's a static PWA,
+offline-capable).
+
+## Testing
+
+- **Property tests** (fast-check): every generated answer verifies against an
+  independent prompt evaluator; operands respect class ranges; the
+  representability invariant holds; div answers are integers; sub never negative.
+- **Equivalence table**: accept/reject rows for the frozen grammar, including
+  the auto-advance prefix-fire cases.
+- **Scheduler distribution**: 10k draws vs `(base+w)²` weights under chi-squared;
+  monotonicity (higher error ⇒ more samples); cold-start uniformity; the session
+  cap and floor.
+- **Determinism golden**: same `(seed, config)` ⇒ byte-identical question
+  sequence, pinned by snapshot; the URL codec round-trips arbitrary configs.
+- **Store fuzzing**: arbitrary corrupt payloads never crash and always salvage.
+- **Playwright**: a full keyboard-only session through a challenge URL,
+  persistence across reload, and axe scans of all three screens (0 serious
+  violations).
+
+## Deliberate calls, documented
+
+- Reciprocal questions reject the `/` key — typing the prompt back would
+  trivially match under rational equality.
+- Skip is Enter-on-empty (the spec's "0 to skip" collides with answers
+  containing 0).
+- Zetamac-parity mode has no skip and no wrong-submit, because Zetamac has
+  neither; the time you lose *is* the penalty.
+- PBs exist only for the benchmark sprint and the Optiver sim — custom-range
+  scores aren't comparable across configs.
+- End-of-session results are announced via `aria-live`; per-question
+  announcements would fight the drill pace.
+- No accounts, no sync, no backend — a backend would double the build for zero
+  interview value. Same-seed challenge links give 90% of head-to-head for 0% of
+  the cost.
+
+## Develop
+
+```sh
+npm install
+npm run dev        # Vite dev server
+npm test           # vitest (core + store)
+npm run e2e        # Playwright (needs: npx playwright install chromium)
+npm run build      # typecheck + production build
+node scripts/gen-demo.mjs   # regenerate the bundled demo data
+```
+
+CI runs typecheck + unit tests + build + e2e on every push and deploys `dist/`
+to GitHub Pages from `main`.
