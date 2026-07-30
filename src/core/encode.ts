@@ -7,7 +7,7 @@
  */
 import { CODEC_BUCKETS } from './questions';
 import type { Mode } from './scoring';
-import type { SessionConfig } from './session';
+import { assessmentDifficulty, type SessionConfig } from './session';
 
 const MODE_CODES: Record<Mode, string> = { zetamac: 'z', optiver: 'o', focus: 'f', fermi: 'e' };
 const CODE_MODES: Record<string, Mode> = { z: 'zetamac', o: 'optiver', f: 'focus', e: 'fermi' };
@@ -84,9 +84,11 @@ export function decodeSession(query: string): SessionConfig | null {
 
   const dRaw = p.get('d') ?? '';
   if (!/^[0-9a-f]*$/.test(dRaw)) return null;
-  const difficulties = dRaw.length === buckets.length
+  let difficulties = dRaw.length === buckets.length
     ? [...dRaw].map((c) => parseInt(c, 16))
     : buckets.map(() => 15); // pre-anneal links replay at full class ranges — byte-identical
+  // assessment surfaces are never annealed — a crafted URL can't mint an easy "sim"
+  difficulties = difficulties.map((d, i) => (assessmentDifficulty(mode, buckets[i] as string) ? 15 : d));
 
   // Opened from a URL ⇒ replay: buckets update normally, PBs/streaks don't.
   return { mode, seed, buckets, weights, difficulties, durationSec, replay: true };

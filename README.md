@@ -141,6 +141,15 @@ offline-capable).
   persistence across reload, and axe scans of all three screens (0 serious
   violations).
 
+## Profiles
+
+Bucket selection is one click, not two dozen checkboxes: **Starter** (the
+gentle end of every family — the fresh-install default), **Core four**,
+**Fractions & decimals**, **Percentages**, **Interview mix** (the hard end of
+everything), and **Everything**. Switchable from the home screen or Settings;
+the checkboxes remain for fine-tuning, and a hand-tuned selection just shows
+as "Custom".
+
 ## Deliberate calls, documented
 
 - Reciprocal questions reject the `/` key — typing the prompt back would
@@ -168,9 +177,16 @@ WebRTC head-to-head:
   exact-graded universe entirely.
 - **Within-bucket adaptive difficulty** — operand ceilings anneal toward your
   edge (fast-and-right +0.02, miss −0.03, slow-but-right −0.01, clamped to the
-  class range). Snapshotted into the share URL like the weights, so replays stay
-  byte-identical; Zetamac-parity buckets never anneal. Landed as schema v2 via
-  the migration chain.
+  class range). Fresh buckets start gentle (0.2, the bottom half of the class
+  range) and calibrate at double speed for the first 25 attempts, so the first
+  minutes of a new type feel winnable while a strong user reaches full ranges
+  within ~20 answers. Snapshotted into the share URL like the weights, so
+  replays stay byte-identical. **Annealing is a practice device only**: the
+  Optiver sim, the Fermi sprint, and Zetamac-parity buckets always run at full
+  class ranges — both in `makeConfig` and in the URL codec, so a crafted link
+  can't mint an artificially easy "assessment" — otherwise their scores would
+  stop corresponding to the real tests' level. Landed as schema v2 via the
+  migration chain.
 - **Audio feedback** — WebAudio tick/buzz, zero assets. The Optiver sim plays a
   verdict-blind click instead: the real test gives no feedback, so the sound
   must not leak one. Mute toggle in Settings.

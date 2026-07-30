@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { useStore } from './storeContext';
 import { CLASS_LABELS, OP_LABELS } from './labels';
 import { OPERAND_CLASSES, type Op } from '../core/questions';
+import { activeProfile, PROFILES } from '../core/presets';
 import { exportJSON, importJSON, saveStore } from '../store/persist';
 import { exportHistoryJSON, loadHistory } from '../store/history';
 import { freshStore } from '../store/schema';
@@ -66,6 +67,32 @@ export function Settings() {
     <div className="page">
       <h2>Settings</h2>
       <p className="micro">Everything is local. No accounts, no sync — export is the backup story.</p>
+
+      <section>
+        <h3>Profiles</h3>
+        <div className="field-row" role="group" aria-label="Bucket profiles">
+          {PROFILES.map((p) => {
+            const active = activeProfile(store.settings.enabledBuckets)?.id === p.id;
+            return (
+              <button
+                key={p.id}
+                type="button"
+                className={`btn${active ? ' primary' : ''}`}
+                aria-pressed={active}
+                title={p.hint}
+                onClick={() =>
+                  update((s) => ({ ...s, settings: { ...s.settings, enabledBuckets: [...p.buckets] } }))
+                }
+              >
+                {p.name}
+              </button>
+            );
+          })}
+        </div>
+        <p className="micro" style={{ marginTop: '0.5rem' }}>
+          {activeProfile(store.settings.enabledBuckets)?.hint ?? 'custom selection — fine-tune below'}
+        </p>
+      </section>
 
       <section>
         <h3>Question types (custom sprint · Optiver sim)</h3>

@@ -64,6 +64,7 @@ body {
 }
 
 button, select, input[type='number'] { font: inherit; color: inherit; }
+input[type='checkbox'] { accent-color: var(--accent); }
 
 .visually-hidden {
   position: absolute; width: 1px; height: 1px;

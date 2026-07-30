@@ -50,10 +50,17 @@ export function targetMs(bucketId: string): number {
   return TARGET_MS_BY_BUCKET[bucketId] ?? TARGET_MS_BY_OP[op] ?? 6000;
 }
 
-export const DIFFICULTY_START = 0.5;
+/**
+ * Fresh buckets start well below the full class range and earn their way up —
+ * the first minutes of a new type should feel winnable, not like the deep end.
+ * Early attempts anneal at double speed so a strong user reaches benchmark
+ * ranges within ~20 fast answers instead of 40.
+ */
+export const DIFFICULTY_START = 0.2;
 const DIFFICULTY_UP = 0.02;   // fast correct answer
 const DIFFICULTY_DOWN = 0.03; // miss
 const DIFFICULTY_DRIFT = 0.01; // correct but slower than target
+const CALIBRATION_ATTEMPTS = 25; // steps count double below this
 
 export function freshBucket(): BucketStats {
   return { attempts: 0, errRate: 0, meanMs: 0, meanFirstKeyMs: 0, difficulty: DIFFICULTY_START };
@@ -91,7 +98,8 @@ export function updateBucket(
       : ms !== null && ms <= targetMs(bucketId) ? DIFFICULTY_UP
       : ms !== null ? -DIFFICULTY_DRIFT
       : 0;
-    difficulty = Math.min(1, Math.max(0, difficulty + step));
+    const pace = s.attempts < CALIBRATION_ATTEMPTS ? 2 : 1; // calibrate fast, then settle
+    difficulty = Math.min(1, Math.max(0, difficulty + step * pace));
   }
   return { attempts: s.attempts + 1, errRate, meanMs, meanFirstKeyMs, difficulty };
 }

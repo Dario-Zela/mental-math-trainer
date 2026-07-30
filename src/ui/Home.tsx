@@ -2,14 +2,25 @@ import { useEffect, useState } from 'react';
 import { useStore } from './storeContext';
 import { bucketLabel } from './labels';
 import { makeConfig, type SessionConfig } from '../core/session';
+import { activeProfile, PROFILES } from '../core/presets';
 import { FERMI_BUCKETS, ZETA_BUCKETS } from '../core/questions';
 import { randomSeed } from '../core/rng';
 import { ZETAMAC_DEFAULT_SEC } from '../core/scoring';
 
 export function Home({ onStart }: { onStart(config: SessionConfig): void }) {
-  const { store } = useStore();
+  const { store, update } = useStore();
   const [focusBucket, setFocusBucket] = useState<string>(store.settings.enabledBuckets[0] ?? 'mul:2x2');
   const firstRun = store.sessions.length === 0;
+  const profile = activeProfile(store.settings.enabledBuckets);
+  // a profile switch can remove the picked focus bucket — fall back gracefully
+  const effectiveFocus = store.settings.enabledBuckets.includes(focusBucket)
+    ? focusBucket
+    : store.settings.enabledBuckets[0] ?? 'mul:2x2';
+
+  const applyProfile = (id: string) => {
+    const p = PROFILES.find((x) => x.id === id);
+    if (p) update((s) => ({ ...s, settings: { ...s.settings, enabledBuckets: [...p.buckets] } }));
+  };
 
   const start = (mode: 'zetamac-bench' | 'zetamac-custom' | 'optiver' | 'focus' | 'fermi') => {
     const seed = randomSeed(Math.random());
@@ -23,7 +34,7 @@ export function Home({ onStart }: { onStart(config: SessionConfig): void }) {
     } else if (mode === 'fermi') {
       onStart(makeConfig('fermi', [...FERMI_BUCKETS], store.buckets, seed));
     } else {
-      onStart(makeConfig('focus', [focusBucket], store.buckets, seed));
+      onStart(makeConfig('focus', [effectiveFocus], store.buckets, seed));
     }
   };
 
@@ -97,7 +108,8 @@ export function Home({ onStart }: { onStart(config: SessionConfig): void }) {
           <span>
             <span className="name">Custom sprint</span>
             <span className="desc">
-              Your {enabledCount} enabled question types, weakness-weighted. Plotted as a separate series.
+              {profile ? `${profile.name} profile` : 'Custom pick'} · {enabledCount} types, weakness-weighted.
+              Plotted as a separate series.
             </span>
           </span>
           <span className="meta">{store.settings.mode.durationSec}s · +1 · auto-advance</span>
@@ -128,8 +140,15 @@ export function Home({ onStart }: { onStart(config: SessionConfig): void }) {
         </button>
       </div>
       <div className="focus-picker">
+        <label className="micro" htmlFor="profile-pick">Profile</label>
+        <select id="profile-pick" value={profile?.id ?? 'custom'} onChange={(e) => applyProfile(e.target.value)}>
+          {PROFILES.map((p) => (
+            <option key={p.id} value={p.id}>{p.name}</option>
+          ))}
+          {!profile && <option value="custom">Custom (from Settings)</option>}
+        </select>
         <label className="micro" htmlFor="focus-bucket">Focus type</label>
-        <select id="focus-bucket" value={focusBucket} onChange={(e) => setFocusBucket(e.target.value)}>
+        <select id="focus-bucket" value={effectiveFocus} onChange={(e) => setFocusBucket(e.target.value)}>
           {store.settings.enabledBuckets.map((b) => (
             <option key={b} value={b}>{bucketLabel(b)}</option>
           ))}

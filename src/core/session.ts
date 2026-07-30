@@ -52,13 +52,18 @@ export function makeConfig(
   return {
     mode, seed, buckets, durationSec: dur, replay: false,
     weights: snapshotWeights(buckets, stats, zetaParity),
-    // parity and fermi buckets never anneal: their ranges ARE the contract
+    // Annealed difficulty is a PRACTICE device. Assessments — the Optiver sim,
+    // the Fermi sprint, and Zetamac-parity buckets — always run at full class
+    // ranges, or their scores would stop corresponding to the real test's level.
     difficulties: buckets.map((b) =>
-      b.endsWith(':zeta') || b.startsWith('fermi:')
-        ? 15
-        : Math.round((stats[b]?.difficulty ?? DIFFICULTY_START) * 15),
+      assessmentDifficulty(mode, b) ? 15 : Math.round((stats[b]?.difficulty ?? DIFFICULTY_START) * 15),
     ),
   };
+}
+
+/** True when this mode/bucket pair is an assessment surface: never annealed. */
+export function assessmentDifficulty(mode: Mode, bucketId: string): boolean {
+  return mode === 'optiver' || mode === 'fermi' || bucketId.endsWith(':zeta') || bucketId.startsWith('fermi:');
 }
 
 export interface QuestionRecord {

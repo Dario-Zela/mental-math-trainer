@@ -11,6 +11,7 @@ import type { BucketStats } from '../core/buckets';
 import type { Mode } from '../core/scoring';
 import type { QuestionRecord, SessionSummary } from '../core/session';
 import { ALL_BUCKETS } from '../core/questions';
+import { DEFAULT_PROFILE } from '../core/presets';
 
 export const CURRENT_VERSION = 2;
 export const MAX_SESSIONS = 1000;
@@ -46,7 +47,9 @@ export function freshStore(): StoreV2 {
   return {
     version: 2,
     settings: {
-      enabledBuckets: [...ALL_BUCKETS],
+      // Starter profile, not everything: a fresh install's first custom sprint
+      // should feel winnable. The full ladder is one profile click away.
+      enabledBuckets: [...DEFAULT_PROFILE.buckets],
       mode: { mode: 'zetamac', durationSec: 120 },
       targetScore: null,
       sound: true,

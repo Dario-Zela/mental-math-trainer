@@ -58,17 +58,22 @@ describe('session scoring & weakness updates', () => {
     expect(b.errRate).toBe(0);
     expect(b.meanMs).toBe(3000);
     expect(b.meanFirstKeyMs).toBe(1200);
-    expect(b.difficulty).toBeCloseTo(0.52); // fast correct answer anneals upward
+    expect(b.difficulty).toBeCloseTo(0.24); // fast correct anneals upward, ×2 while calibrating
   });
 
-  it('difficulty anneals: misses back off, slow-but-right drifts down, and it clamps', () => {
+  it('difficulty starts gentle (0.2), anneals asymmetrically, and clamps', () => {
     let b = freshBucket();
+    expect(b.difficulty).toBe(0.2); // the first minutes of a new type feel winnable
     b = updateBucket(b, true, 5000, null, 'mul:2x2');
-    expect(b.difficulty).toBeCloseTo(0.47); // miss: −0.03
+    expect(b.difficulty).toBeCloseTo(0.14); // miss: −0.03, ×2 during calibration
     b = updateBucket(b, false, 20_000, null, 'mul:2x2');
-    expect(b.difficulty).toBeCloseTo(0.46); // correct but over the 9s target: −0.01
+    expect(b.difficulty).toBeCloseTo(0.12); // correct but over the 9s target: −0.01 ×2
     for (let i = 0; i < 60; i++) b = updateBucket(b, false, 1000, null, 'mul:2x2');
     expect(b.difficulty).toBe(1); // clamped at the top
+    // a strong user reaches full class ranges within the calibration window
+    let fast = freshBucket();
+    for (let i = 0; i < 20; i++) fast = updateBucket(fast, false, 1000, null, 'mul:2x2');
+    expect(fast.difficulty).toBe(1);
   });
 
   it('skips count as misses for errRate but never touch meanMs', () => {
@@ -172,13 +177,25 @@ describe('benchmark detection & weight snapshots', () => {
     expect(makeConfig('optiver', ['add:2d2d', 'mul:2x2'], stats, 1).weights).toEqual([0, 0]);
   });
 
-  it('difficulty snapshots quantise per bucket; zeta and fermi are pinned to full range', () => {
+  it('practice modes snapshot annealed difficulty; assessments always run full range', () => {
     const stats: Record<string, BucketStats> = {
       'mul:2x2': { ...freshBucket(), attempts: 30, difficulty: 0.2 },
       'mul:zeta': { ...freshBucket(), attempts: 30, difficulty: 0.2 },
     };
-    const config = makeConfig('optiver', ['mul:2x2', 'mul:zeta', 'fermi:mul'], stats, 1);
-    expect(config.difficulties).toEqual([3, 15, 15]);
+    // practice: custom sprint and focus drill anneal (zeta buckets still pinned)
+    expect(makeConfig('zetamac', ['mul:2x2', 'mul:zeta'], stats, 1, 60).difficulties).toEqual([3, 15]);
+    expect(makeConfig('focus', ['mul:2x2'], stats, 1).difficulties).toEqual([3]);
+    // assessments: the Optiver sim and the Fermi sprint pin EVERY bucket —
+    // an annealed-easy sim would stop corresponding to the real test's level
+    expect(makeConfig('optiver', ['mul:2x2', 'mul:zeta', 'fermi:mul'], stats, 1).difficulties).toEqual([15, 15, 15]);
+    expect(makeConfig('fermi', ['fermi:mul', 'fermi:div'], stats, 1).difficulties).toEqual([15, 15]);
+  });
+
+  it('the codec refuses annealed difficulties on assessment modes (no crafted easy sims)', () => {
+    const config = makeConfig('optiver', ['mul:2x2', 'add:2d2d'], {}, 7);
+    const url = encodeSession(config).replace(/d=ff/, 'd=11'); // tamper: claim difficulty 1/15
+    const decoded = decodeSession(url);
+    expect(decoded?.difficulties).toEqual([15, 15]);
   });
 });
 
@@ -225,7 +242,8 @@ describe('URL codec', () => {
       return {
         mode, seed, buckets,
         weights: buckets.map((_, i) => (weightSeed + i) % 16),
-        difficulties: buckets.map((_, i) => (weightSeed * 3 + i) % 16),
+        // optiver is an assessment: the codec pins its difficulties to 15
+        difficulties: buckets.map((_, i) => (mode === 'optiver' ? 15 : (weightSeed * 3 + i) % 16)),
         durationSec: mode === 'zetamac' ? durationSec : mode === 'optiver' ? 480 : null,
         replay: true,
       };
