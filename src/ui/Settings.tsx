@@ -98,6 +98,20 @@ export function Settings() {
       </section>
 
       <section>
+        <h3>Sound</h3>
+        <div className="field-row">
+          <label style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            <input
+              type="checkbox"
+              checked={store.settings.sound}
+              onChange={(e) => update((s) => ({ ...s, settings: { ...s.settings, sound: e.target.checked } }))}
+            />
+            Audio feedback (tick/buzz; a neutral click in the Optiver sim so no verdict leaks)
+          </label>
+        </div>
+      </section>
+
+      <section>
         <h3>Target score (stats chart line)</h3>
         <div className="field-row">
           <label htmlFor="target">Target</label>

@@ -4,6 +4,7 @@ import { bucketLabel, fmtClock, fmtMs, todayLocal } from './labels';
 import { Session, makeConfig, type QuestionRecord, type SessionConfig, type SessionSummary } from '../core/session';
 import { applyKey, matches, parseAnswer } from '../core/answer';
 import { applySession } from '../store/persist';
+import { sounds } from './audio';
 import { encodeSession } from '../core/encode';
 import { randomSeed } from '../core/rng';
 import { ratToFractionString, ratToString } from '../core/rational';
@@ -145,12 +146,18 @@ export function Drill({ config, onExit, onRestart }: DrillProps) {
       const ms = voided ? null : rawMs;
       const firstKeyMs = voided || firstKeyRef.current === null ? null : Math.max(0, firstKeyRef.current - t0);
       const { verdict } = session.answer(text, ms, firstKeyMs);
+      if (store.settings.sound) {
+        // sim mode gives no per-question feedback, so its sound is verdict-blind
+        if (!rules.showFeedback) sounds.click();
+        else if (verdict === 'correct') sounds.tick();
+        else sounds.buzz();
+      }
       setLastVerdict({ verdict, ms: rawMs });
       const elapsed = performance.now() - startWallRef.current;
       if (session.isDone(elapsed)) finish();
       else advance();
     },
-    [session, advance, finish],
+    [session, advance, finish, store.settings.sound, rules.showFeedback],
   );
 
   const abort = useCallback(() => {
