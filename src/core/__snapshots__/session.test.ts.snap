@@ -1,0 +1,18 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`session determinism > golden sequence for a pinned seed (breaks if generation order ever changes) 1`] = `
+[
+  "312 ÷ 4",
+  "133 − 84",
+  "36 − 10",
+  "126 − 73",
+  "540 ÷ 12",
+  "16 + 72",
+  "640 ÷ 8",
+  "7 + 13",
+  "96 + 54",
+  "24 × 10",
+  "77 − 58",
+  "11 × 61",
+]
+`;
