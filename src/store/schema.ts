@@ -85,7 +85,7 @@ function validSummary(x: unknown): x is SessionSummary {
   );
 }
 
-const MODES: Mode[] = ['zetamac', 'optiver', 'focus'];
+const MODES: Mode[] = ['zetamac', 'optiver', 'focus', 'fermi'];
 
 /**
  * Sanitise an untrusted parsed value into a valid store. Field-by-field: a

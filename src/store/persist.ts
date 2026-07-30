@@ -89,7 +89,9 @@ export function applySession(
   next.lastSessionLog = log;
 
   let newPB = false;
-  const pbEligible = !summary.replay && (summary.mode === 'optiver' || (summary.mode === 'zetamac' && summary.benchmark));
+  const pbEligible =
+    !summary.replay &&
+    (summary.mode === 'optiver' || summary.mode === 'fermi' || (summary.mode === 'zetamac' && summary.benchmark));
   if (pbEligible) {
     const prev = next.pbs[summary.mode];
     if (prev === undefined || summary.score > prev) {

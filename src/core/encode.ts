@@ -9,8 +9,8 @@ import { CODEC_BUCKETS } from './questions';
 import type { Mode } from './scoring';
 import type { SessionConfig } from './session';
 
-const MODE_CODES: Record<Mode, string> = { zetamac: 'z', optiver: 'o', focus: 'f' };
-const CODE_MODES: Record<string, Mode> = { z: 'zetamac', o: 'optiver', f: 'focus' };
+const MODE_CODES: Record<Mode, string> = { zetamac: 'z', optiver: 'o', focus: 'f', fermi: 'e' };
+const CODE_MODES: Record<string, Mode> = { z: 'zetamac', o: 'optiver', f: 'focus', e: 'fermi' };
 
 /**
  * Enabled buckets → hex bitmask over the canonical bucket universe.
@@ -74,6 +74,7 @@ export function decodeSession(query: string): SessionConfig | null {
   if (mode === 'zetamac' && durationSec === null) return null;
   if (mode === 'focus') durationSec = null;
   if (mode === 'optiver') durationSec = 480; // 80-in-8 is fixed; t in the URL is decorative
+  if (mode === 'fermi') durationSec = 120;   // the estimation sprint is fixed too
 
   const wRaw = p.get('w') ?? '';
   if (!/^[0-9a-f]*$/.test(wRaw)) return null;

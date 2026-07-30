@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useStore } from './storeContext';
 import { bucketLabel } from './labels';
 import { makeConfig, type SessionConfig } from '../core/session';
-import { ZETA_BUCKETS } from '../core/questions';
+import { FERMI_BUCKETS, ZETA_BUCKETS } from '../core/questions';
 import { randomSeed } from '../core/rng';
 import { ZETAMAC_DEFAULT_SEC } from '../core/scoring';
 
@@ -11,7 +11,7 @@ export function Home({ onStart }: { onStart(config: SessionConfig): void }) {
   const [focusBucket, setFocusBucket] = useState<string>(store.settings.enabledBuckets[0] ?? 'mul:2x2');
   const firstRun = store.sessions.length === 0;
 
-  const start = (mode: 'zetamac-bench' | 'zetamac-custom' | 'optiver' | 'focus') => {
+  const start = (mode: 'zetamac-bench' | 'zetamac-custom' | 'optiver' | 'focus' | 'fermi') => {
     const seed = randomSeed(Math.random());
     const { enabledBuckets, mode: modeCfg } = store.settings;
     if (mode === 'zetamac-bench') {
@@ -20,6 +20,8 @@ export function Home({ onStart }: { onStart(config: SessionConfig): void }) {
       onStart(makeConfig('zetamac', enabledBuckets, store.buckets, seed, modeCfg.durationSec));
     } else if (mode === 'optiver') {
       onStart(makeConfig('optiver', enabledBuckets, store.buckets, seed));
+    } else if (mode === 'fermi') {
+      onStart(makeConfig('fermi', [...FERMI_BUCKETS], store.buckets, seed));
     } else {
       onStart(makeConfig('focus', [focusBucket], store.buckets, seed));
     }
@@ -32,7 +34,8 @@ export function Home({ onStart }: { onStart(config: SessionConfig): void }) {
       if (e.key === '1') start('zetamac-bench');
       else if (e.key === '2') start('zetamac-custom');
       else if (e.key === '3') start('optiver');
-      else if (e.key === '4') start('focus');
+      else if (e.key === '4') start('fermi');
+      else if (e.key === '5') start('focus');
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -73,6 +76,10 @@ export function Home({ onStart }: { onStart(config: SessionConfig): void }) {
             <span className="micro">Optiver PB</span>
             <span className="num">{store.pbs.optiver ?? '—'}</span>
           </div>
+          <div className="stat">
+            <span className="micro">Fermi PB</span>
+            <span className="num">{store.pbs.fermi ?? '—'}</span>
+          </div>
         </div>
       </section>
 
@@ -103,8 +110,16 @@ export function Home({ onStart }: { onStart(config: SessionConfig): void }) {
           </span>
           <span className="meta">480s · 80q · +1/−1</span>
         </button>
-        <button type="button" className="mode-row" onClick={() => start('focus')}>
+        <button type="button" className="mode-row" onClick={() => start('fermi')}>
           <span className="key" aria-hidden="true">4</span>
+          <span>
+            <span className="name">Fermi sprint</span>
+            <span className="desc">Estimate unwieldy products, quotients and percentages — within ±5% scores.</span>
+          </span>
+          <span className="meta">120s · +1 · ±5%</span>
+        </button>
+        <button type="button" className="mode-row" onClick={() => start('focus')}>
+          <span className="key" aria-hidden="true">5</span>
           <span>
             <span className="name">Focus drill</span>
             <span className="desc">Untimed deliberate practice on one question type, per-question timings shown.</span>

@@ -3,14 +3,14 @@ import uPlot from 'uplot';
 import 'uplot/dist/uPlot.min.css';
 import { useStore } from './storeContext';
 import { bucketLabel, fmtMs, OP_LABELS } from './labels';
-import { OPERAND_CLASSES, type Op } from '../core/questions';
+import { FERMI_BUCKETS, OPERAND_CLASSES, type Op } from '../core/questions';
 import { weakness, type BucketStats } from '../core/buckets';
 import { WEAKNESS_MAX } from '../core/scheduler';
 import { importJSON } from '../store/persist';
 import type { SessionSummary } from '../core/session';
 import demoData from './demo-data.json';
 
-const MODE_TAGS = { zetamac: 'zeta', optiver: '80-in-8', focus: 'focus' } as const;
+const MODE_TAGS = { zetamac: 'zeta', optiver: '80-in-8', focus: 'focus', fermi: 'fermi' } as const;
 
 /* ------------------------------------------------------------------ */
 /* score-over-time chart                                              */
@@ -28,11 +28,11 @@ interface ChartData {
   pb: (number | null)[];
 }
 
-function buildChartData(sessions: SessionSummary[], tab: 'zetamac' | 'optiver', dateAxis: boolean): ChartData {
+function buildChartData(sessions: SessionSummary[], tab: 'zetamac' | 'optiver' | 'fermi', dateAxis: boolean): ChartData {
   const rows = sessions
     .filter((s) => !s.replay && s.mode === tab)
     .sort((a, b) => a.startedAt - b.startedAt);
-  const isMain = (s: SessionSummary) => tab === 'optiver' || s.benchmark;
+  const isMain = (s: SessionSummary) => tab !== 'zetamac' || s.benchmark;
 
   const xs = rows.map((s, i) => (dateAxis ? s.startedAt / 1000 : i + 1));
   const main = rows.map((s) => (isMain(s) ? s.score : null));
@@ -202,6 +202,11 @@ function Heatmap({ buckets }: { buckets: Record<string, BucketStats> }) {
                 : <td aria-hidden="true" />}
             </tr>
           ))}
+          <tr>
+            <th scope="row" style={{ textAlign: 'left' }}>{OP_LABELS.fermi}</th>
+            {FERMI_BUCKETS.map((b) => <HeatCell key={b} id={b} stats={buckets[b]} />)}
+            <td aria-hidden="true" />
+          </tr>
         </tbody>
       </table>
       <p className="micro" style={{ marginTop: '0.5rem' }}>
@@ -282,7 +287,7 @@ function CalendarStrip({ sessions }: { sessions: SessionSummary[] }) {
 
 export function Stats() {
   const { store, update } = useStore();
-  const [tab, setTab] = useState<'zetamac' | 'optiver'>('zetamac');
+  const [tab, setTab] = useState<'zetamac' | 'optiver' | 'fermi'>('zetamac');
   const [dateAxis, setDateAxis] = useState(false);
 
   const chartData = useMemo(
@@ -334,6 +339,12 @@ export function Stats() {
             aria-pressed={tab === 'optiver'} onClick={() => setTab('optiver')}
           >
             Optiver
+          </button>
+          <button
+            type="button" className={`btn${tab === 'fermi' ? ' primary' : ''}`}
+            aria-pressed={tab === 'fermi'} onClick={() => setTab('fermi')}
+          >
+            Fermi
           </button>
           <label style={{ marginLeft: 'auto', display: 'flex', gap: '0.4rem', alignItems: 'center', fontSize: '0.85rem' }}>
             <input type="checkbox" checked={dateAxis} onChange={(e) => setDateAxis(e.target.checked)} />

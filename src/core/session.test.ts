@@ -182,6 +182,33 @@ describe('benchmark detection & weight snapshots', () => {
   });
 });
 
+describe('fermi mode', () => {
+  it('is a 120s sprint graded at ±5%: near answers score, far answers do not', () => {
+    const s = new Session(makeConfig('fermi', ['fermi:mul'], {}, 21));
+    const q = s.next();
+    const exact = q.answer.num / q.answer.den;
+    const near = String(Math.round(exact * 1.03));
+    expect(s.answer(near, 8000, 3000).verdict).toBe('correct');
+    s.next();
+    const q2 = s.current!;
+    const far = String(Math.round((q2.answer.num / q2.answer.den) * 1.2));
+    expect(s.answer(far, 8000, 3000).verdict).toBe('wrong');
+    expect(s.score).toBe(1); // +1, wrong costs nothing
+    expect(s.config.durationSec).toBe(120);
+    expect(s.isDone(120_000)).toBe(true);
+    expect(s.scorer.rules.autoAdvance).toBe(false); // Enter-commit, no prefix-fire on 9-digit answers
+  });
+
+  it('round-trips through the URL codec with its own mode code', () => {
+    const config = makeConfig('fermi', ['fermi:mul', 'fermi:div', 'fermi:pct'], {}, 0xabc123);
+    const encoded = encodeSession(config);
+    expect(encoded).toContain('m=e');
+    const decoded = decodeSession(encoded);
+    expect(decoded).toEqual({ ...config, replay: true });
+    expect(runPrompts(decoded as SessionConfig, 20)).toEqual(runPrompts(config, 20));
+  });
+});
+
 describe('URL codec', () => {
   const configArb: fc.Arbitrary<SessionConfig> = fc
     .record({

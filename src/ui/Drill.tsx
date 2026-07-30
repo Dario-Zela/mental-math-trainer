@@ -319,7 +319,7 @@ function ResultsOrReview(props: {
     : <Results {...props} onReview={() => setReviewing(true)} />;
 }
 
-const MODE_TITLES = { zetamac: 'Zetamac sprint', optiver: 'Optiver 80-in-8', focus: 'Focus drill' } as const;
+const MODE_TITLES = { zetamac: 'Zetamac sprint', optiver: 'Optiver 80-in-8', focus: 'Focus drill', fermi: 'Fermi sprint' } as const;
 
 function Results({ config, applied, maxHandlerMs, onExit, onAgain, onReview }: {
   config: SessionConfig;

@@ -8,7 +8,7 @@ import { mulberry32, type Rng } from './rng';
 import { generateQuestion, type QuestionSpec, ZETA_BUCKETS } from './questions';
 import { type BucketStats, freshBucket, updateBucket, DIFFICULTY_START } from './buckets';
 import { pickBucket, snapshotWeights } from './scheduler';
-import { makeScorer, type Mode, type Scorer, type Verdict, ZETAMAC_DEFAULT_SEC, OPTIVER_SEC } from './scoring';
+import { makeScorer, type Mode, type Scorer, type Verdict, ZETAMAC_DEFAULT_SEC, OPTIVER_SEC, FERMI_SEC } from './scoring';
 import { parseAnswer } from './answer';
 
 export interface SessionConfig {
@@ -44,7 +44,10 @@ export function makeConfig(
   seed: number,
   durationSec: number | null = null,
 ): SessionConfig {
-  const dur = mode === 'zetamac' ? durationSec ?? ZETAMAC_DEFAULT_SEC : mode === 'optiver' ? OPTIVER_SEC : null;
+  const dur = mode === 'zetamac' ? durationSec ?? ZETAMAC_DEFAULT_SEC
+    : mode === 'optiver' ? OPTIVER_SEC
+    : mode === 'fermi' ? FERMI_SEC
+    : null;
   const zetaParity = mode === 'zetamac' && buckets.every((b) => b.endsWith(':zeta'));
   return {
     mode, seed, buckets, durationSec: dur, replay: false,

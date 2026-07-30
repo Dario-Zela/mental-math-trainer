@@ -123,6 +123,8 @@ describe('applySession', () => {
     expect(r.store.pbs.zetamac).toBe(40); // shared-seed replays are excluded
     r = applySession(r.store, summary({ score: 12, mode: 'optiver', benchmark: false }), [], {}, day);
     expect(r.store.pbs.optiver).toBe(12);
+    r = applySession(r.store, summary({ score: 9, mode: 'fermi', benchmark: false }), [], {}, day);
+    expect(r.store.pbs.fermi).toBe(9); // the fermi sprint is fixed-config, so always PB-eligible
   });
 
   it('streak: consecutive days increment, one session per day, gaps reset, focus and replays excluded', () => {

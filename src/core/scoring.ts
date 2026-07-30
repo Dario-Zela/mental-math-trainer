@@ -8,7 +8,7 @@ import type { Rational } from './rational';
 import { answersMatch } from './answer';
 import type { QuestionSpec } from './questions';
 
-export type Mode = 'zetamac' | 'optiver' | 'focus';
+export type Mode = 'zetamac' | 'optiver' | 'focus' | 'fermi';
 export type Verdict = 'correct' | 'wrong' | 'skip';
 
 export interface ModeRules {
@@ -40,6 +40,7 @@ export interface Scorer {
 export const ZETAMAC_DEFAULT_SEC = 120;
 export const OPTIVER_SEC = 480;
 export const OPTIVER_CAP = 80;
+export const FERMI_SEC = 120;
 
 export function makeScorer(mode: Mode, durationSec?: number | null): Scorer {
   switch (mode) {
@@ -90,6 +91,24 @@ export function makeScorer(mode: Mode, durationSec?: number | null): Scorer {
           return { verdict: correct ? 'correct' : 'wrong', delta: correct ? 1 : 0 };
         },
         isDone: () => false, // untimed — the user ends it
+      };
+    }
+    case 'fermi': {
+      // Estimation sprint: 120s, +1 for within ±5%, explicit Enter — no
+      // auto-advance, or a lucky prefix could fire mid-thought on a 9-digit answer.
+      const rules: ModeRules = {
+        mode, durationMs: FERMI_SEC * 1000, questionCap: null,
+        autoAdvance: false, allowWrongSubmit: true, allowSkip: true,
+        showFeedback: true, showRunningScore: true, preRoll: false,
+      };
+      return {
+        rules,
+        onAnswer(spec, given) {
+          if (given === null) return { verdict: 'skip', delta: 0 };
+          const correct = answersMatch(given, spec.answer, spec.grading);
+          return { verdict: correct ? 'correct' : 'wrong', delta: correct ? 1 : 0 };
+        },
+        isDone: (s) => s.elapsedMs >= (rules.durationMs as number),
       };
     }
   }
