@@ -361,6 +361,60 @@ input[type='number'] {
 .split-bar .seg.type { background: var(--ink-dim); opacity: 0.55; }
 .split-ms { text-align: right; font-size: 0.8rem; }
 
+/* ---- coach & learn ------------------------------------------------------- */
+
+.steps {
+  list-style: none; counter-reset: step;
+  margin-top: 0.4rem; font-size: 0.95rem;
+}
+.steps li { counter-increment: step; padding: 0.18rem 0; display: flex; gap: 0.6rem; }
+.steps li::before {
+  content: counter(step);
+  font-size: 0.68rem; color: var(--accent);
+  border: 1px solid var(--hairline-strong); border-radius: 3px;
+  min-width: 1.25rem; height: 1.25rem; display: inline-grid; place-items: center;
+  margin-top: 0.12rem; flex-shrink: 0;
+}
+
+.reveal { text-align: center; }
+.reveal .prompt { justify-content: center; height: auto; font-size: clamp(2rem, 6vw, 3.2rem); }
+.reveal .verdict-line { justify-content: center; height: auto; margin-top: 0.2rem; }
+.reveal .steps { display: inline-block; text-align: left; margin-top: 0.7rem; }
+
+.review-steps { margin-top: 1.2rem; border-top: 1px solid var(--hairline); padding-top: 0.8rem; }
+
+.learn-grid {
+  margin-top: 1.6rem; display: grid; gap: 1rem;
+  grid-template-columns: repeat(auto-fill, minmax(20rem, 1fr));
+}
+.learn-card {
+  border: 1px solid var(--hairline-strong); border-radius: 6px;
+  background: var(--bg-raised); padding: 1.1rem 1.2rem;
+  display: flex; flex-direction: column; gap: 0.5rem;
+}
+.learn-card header { display: flex; align-items: baseline; gap: 0.7rem; justify-content: space-between; }
+.learn-card h3 { font-family: var(--font-num); font-size: 1.02rem; }
+.learn-card .summary { font-weight: 600; font-size: 0.9rem; }
+.learn-card .detail { color: var(--ink-dim); font-size: 0.86rem; }
+.learn-card .example {
+  border: 1px dashed var(--hairline-strong); border-radius: 4px;
+  padding: 0.6rem 0.75rem; margin-top: 0.2rem;
+}
+.learn-card .ex-prompt { font-weight: 700; font-size: 1.15rem; margin-top: 0.15rem; }
+.learn-card .steps { font-size: 0.85rem; }
+.learn-card footer {
+  margin-top: auto; padding-top: 0.6rem; display: flex; align-items: center;
+  justify-content: space-between; gap: 0.6rem;
+}
+
+.mastery {
+  font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.12em;
+  border-radius: 3px; padding: 0.14rem 0.45rem; white-space: nowrap;
+}
+.mastery-new { border: 1px solid var(--hairline-strong); color: var(--ink-dim); }
+.mastery-practising { background: color-mix(in oklab, var(--accent) 18%, var(--bg-raised)); color: var(--ink); border: 1px solid var(--accent); }
+.mastery-mastered { background: var(--ok); color: var(--bg); border: 1px solid var(--ok); }
+
 @media (prefers-reduced-motion: reduce) {
   .entry .caret { animation: none; }
   .pb-toast { animation: none; }

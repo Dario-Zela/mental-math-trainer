@@ -6,6 +6,7 @@ import { applyKey, matches, parseAnswer } from '../core/answer';
 import { applySession } from '../store/persist';
 import { appendHistory, historyRows } from '../store/history';
 import { sounds } from './audio';
+import { explain, technique } from '../core/tricks';
 import { encodeSession } from '../core/encode';
 import { randomSeed } from '../core/rng';
 import { ratToFractionString, ratToString } from '../core/rational';
@@ -41,6 +42,10 @@ export function Drill({ config, onExit, onRestart }: DrillProps) {
   const [remainingMs, setRemainingMs] = useState(rules.durationMs ?? 0);
   const [lastVerdict, setLastVerdict] = useState<{ verdict: Verdict; ms: number } | null>(null);
   const [applied, setApplied] = useState<Applied | null>(null);
+  // coach mode (focus drills only): a missed or surrendered question pauses
+  // on its worked solution until Enter
+  const coach = store.settings.coach && rules.mode === 'focus';
+  const [revealed, setRevealed] = useState<{ spec: QuestionSpec; verdict: Verdict } | null>(null);
 
   const startWallRef = useRef(0);       // performance.now() at clock start
   const startEpochRef = useRef(0);      // Date.now() at clock start
@@ -148,6 +153,7 @@ export function Drill({ config, onExit, onRestart }: DrillProps) {
       const voided = voidedRef.current;
       const ms = voided ? null : rawMs;
       const firstKeyMs = voided || firstKeyRef.current === null ? null : Math.max(0, firstKeyRef.current - t0);
+      const spec = session.current;
       const { verdict } = session.answer(text, ms, firstKeyMs);
       if (store.settings.sound) {
         // sim mode gives no per-question feedback, so its sound is verdict-blind
@@ -156,12 +162,26 @@ export function Drill({ config, onExit, onRestart }: DrillProps) {
         else sounds.buzz();
       }
       setLastVerdict({ verdict, ms: rawMs });
+      if (coach && verdict === 'wrong' && spec) {
+        setRevealed({ spec, verdict }); // study pause: Enter continues
+        return;
+      }
       const elapsed = performance.now() - startWallRef.current;
       if (session.isDone(elapsed)) finish();
       else advance();
     },
-    [session, advance, finish, store.settings.sound, rules.showFeedback],
+    [session, advance, finish, store.settings.sound, rules.showFeedback, coach],
   );
+
+  /** Coach: surrender the question ('h') — scored as a skip, then study it. */
+  const surrender = useCallback(() => {
+    const spec = session.current;
+    if (!spec) return;
+    session.answer(null, null, null);
+    if (store.settings.sound) sounds.buzz();
+    setLastVerdict({ verdict: 'skip', ms: 0 });
+    setRevealed({ spec, verdict: 'skip' });
+  }, [session, store.settings.sound]);
 
   const abort = useCallback(() => {
     // Sim rule: Esc aborts with confirm and DISCARDS the session — no pause.
@@ -179,6 +199,23 @@ export function Drill({ config, onExit, onRestart }: DrillProps) {
     };
     const handleKey = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey || question === null) return;
+      if (revealed) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          setRevealed(null);
+          advance();
+        } else if (e.key === 'Escape') {
+          e.preventDefault();
+          setRevealed(null);
+          finish();
+        }
+        return;
+      }
+      if (coach && e.key === 'h') {
+        e.preventDefault();
+        surrender();
+        return;
+      }
       if (e.key === 'Escape') {
         e.preventDefault();
         if (rules.durationMs === null) finish(); // focus drill: Esc ends & saves
@@ -209,7 +246,7 @@ export function Drill({ config, onExit, onRestart }: DrillProps) {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [phase, input, question, rules, submit, abort, finish]);
+  }, [phase, input, question, rules, submit, abort, finish, revealed, coach, surrender, advance]);
 
   if (phase === 'done' && applied) {
     return (
@@ -267,6 +304,8 @@ export function Drill({ config, onExit, onRestart }: DrillProps) {
             <div className="preroll num" aria-live="assertive">{preCount}</div>
             <p className="preroll-note">80 questions · 8 minutes · +1 right, −1 wrong · no feedback until the end</p>
           </>
+        ) : revealed ? (
+          <RevealPanel spec={revealed.spec} verdict={revealed.verdict} />
         ) : (
           <>
             <div className="prompt" aria-label={`Question: ${question?.prompt ?? ''}`}>
@@ -295,11 +334,13 @@ export function Drill({ config, onExit, onRestart }: DrillProps) {
 
       <div className="drill-foot">
         <span>
-          {rules.autoAdvance
-            ? <>type the answer — it advances itself</>
-            : rules.allowSkip
-              ? <><kbd>Enter</kbd> submit · <kbd>Enter</kbd> on empty skips</>
-              : null}
+          {revealed
+            ? <><kbd>Enter</kbd> next question</>
+            : rules.autoAdvance
+              ? <>type the answer — it advances itself</>
+              : rules.allowSkip
+                ? <><kbd>Enter</kbd> submit · <kbd>Enter</kbd> on empty skips{coach && <> · <kbd>h</kbd> show the trick</>}</>
+                : null}
         </span>
         <span><kbd>Esc</kbd> {rules.durationMs === null ? 'end session' : 'abort'}</span>
       </div>
@@ -308,6 +349,25 @@ export function Drill({ config, onExit, onRestart }: DrillProps) {
 }
 
 /* ---------------------------------------------------------------------- */
+
+/** Coach study pause: the missed question, solved with its best technique. */
+function RevealPanel({ spec, verdict }: { spec: QuestionSpec; verdict: Verdict }) {
+  const e = explain(spec);
+  return (
+    <div className="reveal" aria-live="polite">
+      <div className="prompt">{spec.prompt}</div>
+      <p className="verdict-line">
+        {verdict === 'wrong'
+          ? <span className="bad">✗ wrong — here's the fast way</span>
+          : <span>⏭ revealed — scored as a skip</span>}
+      </p>
+      <p className="micro">{technique(e.techniqueId).name}</p>
+      <ol className="steps">
+        {e.steps.map((s, i) => <li key={i} className="num">{s}</li>)}
+      </ol>
+    </div>
+  );
+}
 
 function ResultsOrReview(props: {
   config: SessionConfig;
@@ -445,6 +505,19 @@ function Results({ config, applied, maxHandlerMs, onExit, onAgain, onReview }: {
   );
 }
 
+/** The worked solution, on every review card — the trick applied to THIS question. */
+function ReviewSteps({ spec }: { spec: QuestionSpec }) {
+  const e = explain(spec);
+  return (
+    <div className="review-steps">
+      <span className="micro">{technique(e.techniqueId).name}</span>
+      <ol className="steps">
+        {e.steps.map((s, i) => <li key={i} className="num">{s}</li>)}
+      </ol>
+    </div>
+  );
+}
+
 function Review({ log, onBack }: { log: QuestionRecord[]; onBack(): void }) {
   const [idx, setIdx] = useState(0);
   const r = log[idx] as QuestionRecord;
@@ -484,6 +557,7 @@ function Review({ log, onBack }: { log: QuestionRecord[]; onBack(): void }) {
         <dt>Type</dt><dd style={{ fontFamily: 'var(--font-ui)' }}>{bucketLabel(r.spec.bucketId)}</dd>
         <dt>Time</dt><dd>{fmtMs(r.ms)}{r.firstKeyMs !== null ? ` (${fmtMs(r.firstKeyMs)} to first key)` : ''}</dd>
       </dl>
+      <ReviewSteps spec={r.spec} />
       <progress value={idx + 1} max={log.length} aria-label="Position in review" />
       <p className="nav-hint">← → step through · Esc back to results</p>
     </div>

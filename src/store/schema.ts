@@ -30,6 +30,8 @@ export interface StoreV2 {
     targetScore: number | null;
     /** Audio feedback (WebAudio tick/buzz; a neutral click in sim mode). */
     sound: boolean;
+    /** Coach mode in focus drills: worked solutions on misses, 'h' to reveal. Additive field, defaults off. */
+    coach: boolean;
   };
   buckets: Record<string, BucketStats>;
   sessions: SessionSummary[];
@@ -53,6 +55,7 @@ export function freshStore(): StoreV2 {
       mode: { mode: 'zetamac', durationSec: 120 },
       targetScore: null,
       sound: true,
+      coach: false,
     },
     buckets: {},
     sessions: [],
@@ -112,6 +115,7 @@ function sanitise(raw: Record<string, unknown>): StoreV2 {
     out.settings.targetScore = settings.targetScore as number | null;
   }
   if (typeof settings.sound === 'boolean') out.settings.sound = settings.sound;
+  if (typeof settings.coach === 'boolean') out.settings.coach = settings.coach;
 
   if (isObj(raw.buckets)) {
     for (const [k, v] of Object.entries(raw.buckets)) {

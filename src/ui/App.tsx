@@ -4,6 +4,7 @@ import { Home } from './Home';
 import { Drill } from './Drill';
 import { Stats } from './Stats';
 import { Settings } from './Settings';
+import { Learn } from './Learn';
 import { decodeSession } from '../core/encode';
 import type { SessionConfig } from '../core/session';
 
@@ -68,12 +69,16 @@ export default function App() {
             </a>
             <nav aria-label="Main">
               <a href="#/" aria-current={route === '' ? 'page' : undefined}>Drill</a>
+              <a href="#/learn" aria-current={route === 'learn' ? 'page' : undefined}>Learn</a>
               <a href="#/stats" aria-current={route === 'stats' ? 'page' : undefined}>Stats</a>
               <a href="#/settings" aria-current={route === 'settings' ? 'page' : undefined}>Settings</a>
             </nav>
           </header>
           <main>
-            {route === 'stats' ? <Stats /> : route === 'settings' ? <Settings /> : <Home onStart={startSession} />}
+            {route === 'stats' ? <Stats />
+              : route === 'settings' ? <Settings />
+              : route === 'learn' ? <Learn onStart={startSession} />
+              : <Home onStart={startSession} />}
           </main>
         </div>
       )}

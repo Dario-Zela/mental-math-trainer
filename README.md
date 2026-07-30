@@ -141,6 +141,30 @@ offline-capable).
   persistence across reload, and axe scans of all three screens (0 serious
   violations).
 
+## Coach mode & the Learn screen
+
+The trainer doesn't just measure — it teaches. **Learn** is a catalogue of 32
+mental-math techniques (compensation, split-and-distribute, difference of
+squares, squares ending in 5, the Vedic near-100 base method, same-tens pairs,
+double-and-halve, ÷5-as-×2, fraction cross-cancelling, 10%-building-blocks,
+the eighths family, halving chains, divisibility rules…), each with a worked
+example and a mastery state (new → practising → mastered) derived from your
+actual bucket stats. One key launches a practice drill on that technique's
+bucket.
+
+**Coach mode** (focus drills only — assessments stay hint-free): a wrong
+answer pauses on the worked solution *of the question you just missed*, chosen
+by an operand-aware dispatcher — `explain()` in the framework-free core picks
+the best trick for the concrete numbers (47×53 gets difference-of-squares,
+47×43 gets the same-tens rule, 86×5 gets ×10-halved) and shows the actual
+steps. Pressing `h` surrenders a question to see it solved — scored as a skip,
+so the weakness model stays honest. The review pass shows the worked solution
+for every question in every mode.
+
+The explainer is property-tested: every generatable question in every bucket
+gets a worked solution whose final step lands on the canonical answer (fermi
+excepted — its steps are estimates by design).
+
 ## Profiles
 
 Bucket selection is one click, not two dozen checkboxes: **Starter** (the

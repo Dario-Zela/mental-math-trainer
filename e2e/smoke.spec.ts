@@ -86,6 +86,33 @@ test('keyboard launch from home starts the benchmark sprint', async ({ page }) =
   await expect(page.locator('.hero')).toBeVisible();
 });
 
+test('coach mode: a Learn practice drill pauses on the worked trick after a miss', async ({ page }) => {
+  await page.goto('/mental-math-trainer/#/learn');
+  await expect(page.locator('.learn-card').first()).toBeVisible();
+  await page.locator('.learn-card').first().getByRole('button', { name: /Practice/ }).click();
+  await expect(page.locator('.prompt')).toBeVisible();
+
+  // deliberately wrong answer → the study pause shows numbered worked steps
+  await page.keyboard.type('1', { delay: 20 });
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.reveal .steps li').first()).toBeVisible();
+  await expect(page.getByText("✗ wrong — here's the fast way")).toBeVisible();
+
+  // Enter resumes; 'h' surrenders the next question and shows its solution
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.entry')).toBeVisible();
+  await page.keyboard.press('h');
+  await expect(page.getByText('⏭ revealed — scored as a skip')).toBeVisible();
+  await expect(page.locator('.reveal .steps li').first()).toBeVisible();
+
+  // Esc ends the focus session; review pass shows worked steps on every card
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.results .score')).toBeVisible();
+  await page.keyboard.press('r');
+  await expect(page.locator('.review-steps .steps li').first()).toBeVisible();
+});
+
 test.describe('accessibility', () => {
   const scan = async (page: Page) => {
     const results = await new AxeBuilder({ page }).analyze();
@@ -107,6 +134,12 @@ test.describe('accessibility', () => {
 
   test('settings screen has no serious axe violations', async ({ page }) => {
     await page.goto('/mental-math-trainer/#/settings');
+    await scan(page);
+  });
+
+  test('learn screen has no serious axe violations', async ({ page }) => {
+    await page.goto('/mental-math-trainer/#/learn');
+    await expect(page.locator('.learn-card').first()).toBeVisible();
     await scan(page);
   });
 });

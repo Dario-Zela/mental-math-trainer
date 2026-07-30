@@ -156,6 +156,14 @@ export function Home({ onStart }: { onStart(config: SessionConfig): void }) {
             <option key={b} value={b}>{bucketLabel(b)}</option>
           ))}
         </select>
+        <label className="micro" style={{ display: 'flex', gap: '0.35rem', alignItems: 'center', cursor: 'pointer' }}>
+          <input
+            type="checkbox"
+            checked={store.settings.coach}
+            onChange={(e) => update((s) => ({ ...s, settings: { ...s.settings, coach: e.target.checked } }))}
+          />
+          coach
+        </label>
       </div>
     </>
   );
