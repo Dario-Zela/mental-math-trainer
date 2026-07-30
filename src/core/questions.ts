@@ -15,7 +15,9 @@ import { type Rational, rat, ratAdd, ratMul, ratToDecimalString } from './ration
 export type Op =
   | 'add' | 'sub' | 'mul' | 'div'
   | 'frac_add' | 'frac_mul'
-  | 'dec_mul' | 'pct_of' | 'pct_change' | 'recip'
+  | 'dec_mul' | 'dec_add' | 'dec_div'
+  | 'pct_of' | 'pct_change' | 'recip'
+  | 'missing'
   | 'fermi';
 
 /**
@@ -55,13 +57,35 @@ export const OPERAND_CLASSES: Record<Exclude<Op, 'fermi'>, string[]> = {
   frac_add: ['small', 'any'],
   frac_mul: ['small', 'any'],
   dec_mul: ['clean', 'ugly'],
+  dec_add: ['2dp'],
+  dec_div: ['1dp'],
   pct_of: ['clean', 'ugly'],
   pct_change: ['clean', 'ugly'],
   recip: ['term', 'rep'],
+  missing: ['mul'],
 };
 
 export const ZETA_BUCKETS = ['add:zeta', 'sub:zeta', 'mul:zeta', 'div:zeta'] as const;
 export const FERMI_BUCKETS = ['fermi:mul', 'fermi:div', 'fermi:pct'] as const;
+
+/**
+ * The Optiver sim's locked question mix — matched to what candidate accounts
+ * and prep guides report the real 80-in-8 actually asks (examples: 47+38,
+ * 156+279, 23×17, 78×26, 168÷12, 455÷35, 12.75+8.46, 4.5×7.2, 84.6÷3.5,
+ * 3/4+5/8, 2/3×9/4, and 66 × ? = 138.6). Notably ABSENT from every account:
+ * percentages and standalone reciprocals — so they're absent here too.
+ * Locked for the same reason Zetamac parity locks ranges: a sim whose content
+ * tracked the user's settings would produce scores comparable to nothing.
+ */
+export const OPTIVER_BUCKETS = [
+  'add:2d2d', 'add:3d3d', 'sub:2d2d',
+  'mul:1x2', 'mul:2x2',
+  'div:1x2', 'div:2x2',
+  'frac_add:small', 'frac_mul:small',
+  'dec_mul:clean', 'dec_mul:ugly',
+  'dec_add:2dp', 'dec_div:1dp',
+  'missing:mul',
+] as const;
 
 /** Every custom-drill bucket, in UI order. */
 export const ALL_BUCKETS: string[] = (Object.keys(OPERAND_CLASSES) as Exclude<Op, 'fermi'>[]).flatMap((op) =>
@@ -88,6 +112,7 @@ export const CODEC_BUCKETS: string[] = [
   // — v1 universe above this line; stretch buckets append below —
   'recip:rep',
   'fermi:mul', 'fermi:div', 'fermi:pct',
+  'missing:mul', 'dec_add:2dp', 'dec_div:1dp',
 ];
 
 export function bucketOp(bucketId: string): Op {
@@ -245,6 +270,53 @@ function genPctChange(cls: string, rng: Rng): { prompt: string; answer: Rational
   }
 }
 
+/** A genuinely-decimal 2dp value in [1.01, 99.99] (never a whole number). */
+function twoDp(rng: Rng): Rational {
+  let x = randInt(rng, 101, 9999);
+  if (x % 100 === 0) x += 7;
+  return rat(x, 100);
+}
+
+/** Decimal ± with 2dp operands (the 12.75 + 8.46 shape); sub as the inverse of add. */
+function genDecAdd(rng: Rng): { prompt: string; answer: Rational } {
+  const a = twoDp(rng);
+  const b = twoDp(rng);
+  const sum = ratAdd(a, b);
+  if (rng() < 0.5) {
+    return { prompt: `${ratToDecimalString(a)} + ${ratToDecimalString(b)}`, answer: sum };
+  }
+  return { prompt: `${ratToDecimalString(sum)} ${MINUS} ${ratToDecimalString(a)}`, answer: b };
+}
+
+/** Decimal division (the 84.6 ÷ 3.5 shape): 1dp divisor, integer quotient — generated inverse. */
+function genDecDiv(rng: Rng): { prompt: string; answer: Rational } {
+  let tenths = randInt(rng, 11, 99);
+  if (tenths % 10 === 0) tenths += 1;
+  const d = rat(tenths, 10);
+  const q = randInt(rng, 3, 29);
+  return { prompt: `${ratToDecimalString(ratMul(d, rat(q)))} ${DIVIDE} ${ratToDecimalString(d)}`, answer: rat(q) };
+}
+
+/**
+ * Missing-operand questions (the 66 × ? = 138.6 shape) — a division in
+ * disguise, reportedly the format that trips people up in the real 80-in-8.
+ * Known factor from the times-tables range; the hidden factor is an integer
+ * or a 1dp decimal.
+ */
+function genMissing(rng: Rng): { prompt: string; answer: Rational } {
+  const a = randInt(rng, 2, 19);
+  let q: Rational;
+  if (rng() < 0.5) {
+    q = rat(randInt(rng, 12, 99));
+  } else {
+    let tenths = randInt(rng, 11, 99);
+    if (tenths % 10 === 0) tenths += 1;
+    q = rat(tenths, 10);
+  }
+  const b = ratMul(rat(a), q);
+  return { prompt: `${a} ${TIMES} ? = ${ratToDecimalString(b)}`, answer: q };
+}
+
 function genRecip(cls: string, rng: Rng): { prompt: string; answer: Rational } {
   const n = cls === 'rep' ? pick(rng, RECIP_REP_SET) : pick(rng, RECIP_SET);
   return { prompt: `1/${n}`, answer: rat(1, n) };
@@ -298,9 +370,12 @@ function generateOnce(bucketId: string, rng: Rng, now: number, difficulty: numbe
     case 'mul': case 'div': q = genMulDiv(op, cls, rng, difficulty); break;
     case 'frac_add': case 'frac_mul': q = genFrac(op, cls, rng, difficulty); break;
     case 'dec_mul': q = genDecMul(cls, rng); break;
+    case 'dec_add': q = genDecAdd(rng); break;
+    case 'dec_div': q = genDecDiv(rng); break;
     case 'pct_of': q = genPctOf(cls, rng); break;
     case 'pct_change': q = genPctChange(cls, rng); break;
     case 'recip': q = genRecip(cls, rng); break;
+    case 'missing': q = genMissing(rng); break;
     case 'fermi': q = genFermi(cls, rng); break;
     default: throw new Error(`unknown op ${op satisfies never}`);
   }

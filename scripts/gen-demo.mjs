@@ -64,6 +64,8 @@ const push = (mode, benchmark, score, answered, correct, medianMs, durationSec, 
 };
 
 const ZETA = ['add:zeta', 'sub:zeta', 'mul:zeta', 'div:zeta'];
+const OPT = ['add:2d2d', 'add:3d3d', 'sub:2d2d', 'mul:1x2', 'mul:2x2', 'div:1x2', 'div:2x2',
+  'frac_add:small', 'frac_mul:small', 'dec_mul:clean', 'dec_mul:ugly', 'dec_add:2dp', 'dec_div:1dp', 'missing:mul'];
 const CUSTOM = ['mul:2x2', 'dec_mul:ugly', 'frac_add:any', 'pct_change:ugly', 'div:2x2', 'pct_of:ugly'];
 
 for (let w = 0; w < WEEKS; w++) {
@@ -86,7 +88,7 @@ for (let w = 0; w < WEEKS; w++) {
       const correct = Math.round(38 + 28 * progress + between(-5, 5));
       const wrong = Math.round(between(2, 9) * (1 - 0.6 * progress));
       const answered = Math.min(80, correct + wrong + Math.round(between(0, 6)));
-      push('optiver', false, correct - wrong, answered, correct, jitter(6200 - 2200 * progress, 0.1), 480, CUSTOM.concat('add:2d2d', 'pct_of:clean'));
+      push('optiver', false, correct - wrong, answered, correct, jitter(6200 - 2200 * progress, 0.1), 480, OPT);
     }
     if (rnd() < 0.3) {
       const b = CUSTOM[Math.floor(rnd() * CUSTOM.length)];

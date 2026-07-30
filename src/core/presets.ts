@@ -36,7 +36,18 @@ export const PROFILES: Profile[] = [
     hint: 'everything with a denominator or a decimal point',
     buckets: [
       'frac_add:small', 'frac_add:any', 'frac_mul:small', 'frac_mul:any',
-      'dec_mul:clean', 'dec_mul:ugly', 'recip:term', 'recip:rep',
+      'dec_mul:clean', 'dec_mul:ugly', 'dec_add:2dp', 'dec_div:1dp',
+      'recip:term', 'recip:rep',
+    ],
+  },
+  {
+    id: 'optiver-mix',
+    name: '80-in-8 mix',
+    hint: "the sim's exact question mix, for practising with feedback on",
+    buckets: [
+      'add:2d2d', 'add:3d3d', 'sub:2d2d', 'mul:1x2', 'mul:2x2', 'div:1x2', 'div:2x2',
+      'frac_add:small', 'frac_mul:small', 'dec_mul:clean', 'dec_mul:ugly',
+      'dec_add:2dp', 'dec_div:1dp', 'missing:mul',
     ],
   },
   {

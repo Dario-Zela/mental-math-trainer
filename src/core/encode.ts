@@ -78,9 +78,11 @@ export function decodeSession(query: string): SessionConfig | null {
 
   const wRaw = p.get('w') ?? '';
   if (!/^[0-9a-f]*$/.test(wRaw)) return null;
-  const weights = wRaw.length === buckets.length
+  let weights = wRaw.length === buckets.length
     ? [...wRaw].map((c) => parseInt(c, 16))
     : buckets.map(() => 0); // tolerate missing/mismatched weights: uniform replay
+  // assessments sample uniformly — a crafted URL can't mint a skewed "sim"
+  if (mode === 'optiver' || mode === 'fermi') weights = weights.map(() => 0);
 
   const dRaw = p.get('d') ?? '';
   if (!/^[0-9a-f]*$/.test(dRaw)) return null;

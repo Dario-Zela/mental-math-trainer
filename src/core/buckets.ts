@@ -41,6 +41,8 @@ const TARGET_MS_BY_BUCKET: Record<string, number> = {
   'mul:1x2': 4000, 'mul:2x2': 9000, 'mul:1x3': 8000, 'mul:zeta': 5000,
   'div:1x2': 5000, 'div:2x2': 10_000, 'div:1x3': 9000, 'div:zeta': 5000,
   'dec_mul:clean': 5000, 'dec_mul:ugly': 9000,
+  'dec_add:2dp': 6000, 'dec_div:1dp': 7000,
+  'missing:mul': 5000,
   'recip:rep': 5000,
   'fermi:mul': 12_000, 'fermi:div': 12_000, 'fermi:pct': 12_000,
 };

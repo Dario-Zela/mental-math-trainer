@@ -49,9 +49,13 @@ export function makeConfig(
     : mode === 'fermi' ? FERMI_SEC
     : null;
   const zetaParity = mode === 'zetamac' && buckets.every((b) => b.endsWith(':zeta'));
+  // Assessments sample uniformly, like the real tests do: weakness-skewed
+  // sampling would change the difficulty mix per user and per session, making
+  // sim scores (and PBs) comparable to nothing. Practice modes keep it.
+  const uniform = zetaParity || mode === 'optiver' || mode === 'fermi';
   return {
     mode, seed, buckets, durationSec: dur, replay: false,
-    weights: snapshotWeights(buckets, stats, zetaParity),
+    weights: snapshotWeights(buckets, stats, uniform),
     // Annealed difficulty is a PRACTICE device. Assessments — the Optiver sim,
     // the Fermi sprint, and Zetamac-parity buckets — always run at full class
     // ranges, or their scores would stop corresponding to the real test's level.

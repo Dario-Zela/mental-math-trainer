@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
 import { Session, makeConfig, isBenchmark, type SessionConfig } from './session';
-import { ZETA_BUCKETS, ALL_BUCKETS } from './questions';
+import { ZETA_BUCKETS, ALL_BUCKETS, CODEC_BUCKETS } from './questions';
 import { encodeSession, decodeSession } from './encode';
 import { freshBucket, updateBucket, type BucketStats } from './buckets';
 import { type Rational, ratToDecimalString, isTerminating } from './rational';
@@ -163,18 +163,21 @@ describe('benchmark detection & weight snapshots', () => {
     expect(makeConfig('zetamac', [...ZETA_BUCKETS], skewed, 1, 120).weights).toEqual([0, 0, 0, 0]);
   });
 
-  it('custom sessions snapshot weakness into the config', () => {
+  it('practice sessions snapshot weakness; assessments sample uniformly', () => {
     const stats: Record<string, BucketStats> = {
       'add:2d2d': { attempts: 50, errRate: 0.8, meanMs: 9000, meanFirstKeyMs: 2000, difficulty: 0.3 },
       'mul:2x2': { attempts: 50, errRate: 0, meanMs: 4000, meanFirstKeyMs: 1500, difficulty: 0.8 },
     };
-    const config = makeConfig('optiver', ['add:2d2d', 'mul:2x2'], stats, 1);
-    expect(config.weights[0]).toBeGreaterThan(config.weights[1] as number);
+    const practice = makeConfig('zetamac', ['add:2d2d', 'mul:2x2'], stats, 1, 60);
+    expect(practice.weights[0]).toBeGreaterThan(practice.weights[1] as number);
+    // the sim mirrors the real test: fixed uniform mix, whatever your stats say
+    expect(makeConfig('optiver', ['add:2d2d', 'mul:2x2'], stats, 1).weights).toEqual([0, 0]);
+    expect(makeConfig('fermi', ['fermi:mul', 'fermi:div'], stats, 1).weights).toEqual([0, 0]);
   });
 
-  it('cold-start stats produce an all-zero snapshot', () => {
+  it('cold-start stats produce an all-zero snapshot even in practice modes', () => {
     const stats = { 'add:2d2d': { ...freshBucket(), attempts: 2 } };
-    expect(makeConfig('optiver', ['add:2d2d', 'mul:2x2'], stats, 1).weights).toEqual([0, 0]);
+    expect(makeConfig('zetamac', ['add:2d2d', 'mul:2x2'], stats, 1, 60).weights).toEqual([0, 0]);
   });
 
   it('practice modes snapshot annealed difficulty; assessments always run full range', () => {
@@ -236,13 +239,15 @@ describe('URL codec', () => {
       weightSeed: fc.integer({ min: 0, max: 15 }),
     })
     .map(({ mode, seed, bucketIdx, durationSec, weightSeed }) => {
-      const buckets = mode === 'focus'
-        ? [ALL_BUCKETS[bucketIdx[0] as number] as string]
-        : bucketIdx.sort((a, b) => a - b).map((i) => ALL_BUCKETS[i] as string);
+      // decode returns buckets in CODEC order (≠ ALL_BUCKETS order since the
+      // stretch ops append to the codec's tail) — build the config the same way
+      const buckets = (mode === 'focus' ? bucketIdx.slice(0, 1) : bucketIdx)
+        .map((i) => ALL_BUCKETS[i] as string)
+        .sort((a, b) => CODEC_BUCKETS.indexOf(a) - CODEC_BUCKETS.indexOf(b));
       return {
         mode, seed, buckets,
-        weights: buckets.map((_, i) => (weightSeed + i) % 16),
-        // optiver is an assessment: the codec pins its difficulties to 15
+        weights: buckets.map((_, i) => (mode === 'optiver' ? 0 : (weightSeed + i) % 16)),
+        // optiver is an assessment: the codec pins difficulties to 15 and weights to 0
         difficulties: buckets.map((_, i) => (mode === 'optiver' ? 15 : (weightSeed * 3 + i) % 16)),
         durationSec: mode === 'zetamac' ? durationSec : mode === 'optiver' ? 480 : null,
         replay: true,

@@ -3,7 +3,7 @@ import { useStore } from './storeContext';
 import { bucketLabel } from './labels';
 import { makeConfig, type SessionConfig } from '../core/session';
 import { activeProfile, PROFILES } from '../core/presets';
-import { FERMI_BUCKETS, ZETA_BUCKETS } from '../core/questions';
+import { FERMI_BUCKETS, OPTIVER_BUCKETS, ZETA_BUCKETS } from '../core/questions';
 import { randomSeed } from '../core/rng';
 import { ZETAMAC_DEFAULT_SEC } from '../core/scoring';
 
@@ -30,7 +30,8 @@ export function Home({ onStart }: { onStart(config: SessionConfig): void }) {
     } else if (mode === 'zetamac-custom') {
       onStart(makeConfig('zetamac', enabledBuckets, store.buckets, seed, modeCfg.durationSec));
     } else if (mode === 'optiver') {
-      onStart(makeConfig('optiver', enabledBuckets, store.buckets, seed));
+      // locked test-faithful mix — the sim never tracks the user's settings
+      onStart(makeConfig('optiver', [...OPTIVER_BUCKETS], store.buckets, seed));
     } else if (mode === 'fermi') {
       onStart(makeConfig('fermi', [...FERMI_BUCKETS], store.buckets, seed));
     } else {
@@ -118,7 +119,9 @@ export function Home({ onStart }: { onStart(config: SessionConfig): void }) {
           <span className="key" aria-hidden="true">3</span>
           <span>
             <span className="name">Optiver 80-in-8 — simulation</span>
-            <span className="desc">Real test conditions: no feedback, hidden score, −1 for wrong, Enter to submit.</span>
+            <span className="desc">
+              Real conditions and the real question mix: 2–3-digit ±, 2×2 mults, decimals, small fractions, missing operands.
+            </span>
           </span>
           <span className="meta">480s · 80q · +1/−1</span>
         </button>

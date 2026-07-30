@@ -26,7 +26,7 @@ the heatmap desaturates them.*
 | Mode | Rules |
 |---|---|
 | **Zetamac sprint** | 120s, +1 per correct, auto-advance on the correct keystroke sequence — locked to Zetamac's default ranges so scores calibrate against community numbers. Custom ranges are allowed but labelled and plotted separately. |
-| **Optiver 80-in-8** | 8 minutes, 80 questions, +1/−1, explicit Enter, skip scores 0. A *simulation*, not just a scorer: 3-2-1 pre-roll, no per-question feedback, running score hidden until the end, focus losses recorded, Esc discards. A review pass afterwards steps through every question. |
+| **Optiver 80-in-8** | 8 minutes, 80 questions, +1/−1, explicit Enter, skip scores 0. A *simulation*, not just a scorer: 3-2-1 pre-roll, no per-question feedback, running score hidden until the end, focus losses recorded, Esc discards. A review pass afterwards steps through every question. **The question mix is locked and researched against candidate accounts of the real test** — 2–3-digit add/sub, times-table and 2×2-digit mults, 2-digit-divisor division, decimal ± / × / ÷, small-denominator fractions, and missing-operand questions (66 × ? = 138.6), sampled uniformly. No percentages or reciprocals: no account of the real test mentions them. Fixed content + uniform sampling is what makes sim PBs comparable over time and to the real thing. |
 | **Fermi sprint** | 120s of unwieldy estimation (48,213 × 677; 23% of 6,834,000) graded at ±5% relative error — the trading-interview skill the exact modes can't drill. Enter-commit only: auto-advance on a tolerance band would fire on lucky prefixes. |
 | **Focus drill** | Untimed, one question type, per-question millisecond timings — deliberate practice. |
 
@@ -158,6 +158,12 @@ as "Custom".
   containing 0).
 - Zetamac-parity mode has no skip and no wrong-submit, because Zetamac has
   neither; the time you lose *is* the penalty.
+- The Optiver sim's content is evidence-based, not settings-based: prep guides
+  and candidate accounts consistently describe 2–3-digit arithmetic, decimal
+  operations, small fractions and missing-operand questions — and never
+  percentages — so that's exactly what the sim asks, uniformly sampled.
+  Weakness-weighting and difficulty annealing are practice devices; they never
+  touch an assessment.
 - PBs exist only for the benchmark sprint and the Optiver sim — custom-range
   scores aren't comparable across configs.
 - End-of-session results are announced via `aria-live`; per-question

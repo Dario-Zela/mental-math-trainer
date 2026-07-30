@@ -8,13 +8,20 @@ export const OP_LABELS: Record<Op, string> = {
   frac_add: 'Fractions +',
   frac_mul: 'Fractions ×',
   dec_mul: 'Decimals ×',
+  dec_add: 'Decimals ±',
+  dec_div: 'Decimals ÷',
   pct_of: 'Percent of',
   pct_change: 'Percent change',
   recip: 'Reciprocals',
+  missing: 'Missing operand',
   fermi: 'Fermi ≈',
 };
 
 export const CLASS_LABELS: Record<string, string> = {
+  // op-qualified entries win over bare class names (fermi:mul vs missing:mul)
+  'missing:mul': 'a × ? = b',
+  'dec_add:2dp': 'two decimal places',
+  'dec_div:1dp': 'decimal divisor',
   '2d2d': '2-digit ± 2-digit',
   '3d2d': '3-digit ± 2-digit',
   '3d3d': '3-digit ± 3-digit',
@@ -35,7 +42,7 @@ export const CLASS_LABELS: Record<string, string> = {
 
 export function bucketLabel(bucketId: string): string {
   const [op, cls] = bucketId.split(':') as [Op, string];
-  return `${OP_LABELS[op] ?? op} · ${CLASS_LABELS[cls] ?? cls}`;
+  return `${OP_LABELS[op] ?? op} · ${CLASS_LABELS[bucketId] ?? CLASS_LABELS[cls] ?? cls}`;
 }
 
 export function fmtMs(ms: number | null): string {

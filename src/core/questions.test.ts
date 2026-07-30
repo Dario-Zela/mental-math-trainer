@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
 import { mulberry32 } from './rng';
 import {
-  ALL_BUCKETS, ZETA_BUCKETS, FERMI_BUCKETS, CODEC_BUCKETS, generateQuestion, bucketOp,
+  ALL_BUCKETS, ZETA_BUCKETS, FERMI_BUCKETS, OPTIVER_BUCKETS, CODEC_BUCKETS, generateQuestion, bucketOp,
   MINUS, TIMES, DIVIDE, ARROW, RECIP_SET, RECIP_REP_SET, type QuestionSpec,
 } from './questions';
 import { type Rational, rat, ratAdd, ratSub, ratMul, ratDiv, ratEq, isInteger, isTerminating, decimalPlaces } from './rational';
@@ -35,6 +35,9 @@ function evalPrompt(spec: QuestionSpec): Rational {
     return rat(parseInt(s, 10));
   };
   const p = spec.prompt;
+  // missing-operand: a × ? = b — the answer IS the hidden operand, b ÷ a
+  const missing = p.match(new RegExp(`^([\\d.]+) ${TIMES} \\? = ([\\d.]+)$`));
+  if (missing) return ratDiv(num(missing[2] as string), num(missing[1] as string));
   const pctOf = p.match(/^(\d+)% of (\d+)$/);
   if (pctOf) return ratMul(rat(parseInt(pctOf[1] as string, 10), 100), num(pctOf[2] as string));
   const pctChange = p.match(new RegExp(`^(\\d+) ${ARROW} (\\d+), % change$`));
@@ -105,8 +108,49 @@ describe('generators', () => {
     expect(CODEC_BUCKETS.slice(23, 27)).toEqual([...ZETA_BUCKETS]);
     expect(CODEC_BUCKETS[22]).toBe('recip:term');
     expect(CODEC_BUCKETS.indexOf('recip:rep')).toBe(27);
+    expect(CODEC_BUCKETS.slice(31)).toEqual(['missing:mul', 'dec_add:2dp', 'dec_div:1dp']);
     for (const b of EVERY_BUCKET) expect(CODEC_BUCKETS).toContain(b);
     expect(new Set(CODEC_BUCKETS).size).toBe(CODEC_BUCKETS.length);
+  });
+
+  it('the Optiver sim mix contains only evidence-backed, exact-graded buckets', () => {
+    for (const b of OPTIVER_BUCKETS) {
+      expect(ALL_BUCKETS).toContain(b); // real custom-drill buckets, never zeta/fermi
+      // no percentages, no standalone reciprocals: absent from every candidate account
+      expect(b).not.toMatch(/^(pct_of|pct_change|recip):/);
+    }
+    // the distinctive shapes ARE present: 2×2 mults, decimal ±/÷, missing operand
+    for (const required of ['mul:2x2', 'div:2x2', 'dec_add:2dp', 'dec_div:1dp', 'missing:mul']) {
+      expect(OPTIVER_BUCKETS).toContain(required);
+    }
+  });
+
+  it('missing-operand: known factor from the times tables, hidden factor int or 1dp', () => {
+    fc.assert(
+      fc.property(seedArb, (seed) => {
+        const q = generateQuestion('missing:mul', mulberry32(seed), 0);
+        const known = parseInt(q.prompt.split(` ${TIMES} `)[0] as string, 10);
+        expect(known).toBeGreaterThanOrEqual(2);
+        expect(known).toBeLessThanOrEqual(19);
+        expect(isTerminating(q.answer)).toBe(true);
+        expect(decimalPlaces(q.answer)).toBeLessThanOrEqual(1);
+      }),
+      { numRuns: 500 },
+    );
+  });
+
+  it('decimal ± answers stay exact at ≤ 2dp; decimal ÷ answers are integers', () => {
+    fc.assert(
+      fc.property(seedArb, (seed) => {
+        const add = generateQuestion('dec_add:2dp', mulberry32(seed), 0);
+        expect(isTerminating(add.answer)).toBe(true);
+        expect(decimalPlaces(add.answer)).toBeLessThanOrEqual(2);
+        expect(add.answer.num).toBeGreaterThanOrEqual(0); // sub variant is the inverse of add
+        const div = generateQuestion('dec_div:1dp', mulberry32(seed), 0);
+        expect(isInteger(div.answer)).toBe(true);
+      }),
+      { numRuns: 500 },
+    );
   });
 
   it('div answers are integers, sub answers are never negative', () => {
