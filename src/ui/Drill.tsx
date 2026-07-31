@@ -186,16 +186,16 @@ export function Drill({ config, onExit, onRestart }: DrillProps) {
     setRevealed({ spec, verdict: 'skip', auto });
   }, [session, store.settings.sound]);
 
-  // Memorise shot clock: reveal when NO keystroke lands within the window.
-  // Armed from the prompt and RE-armed by every accepted keystroke (the
-  // `input` dep), so active typing is never interrupted — but a stall of the
-  // full window, before typing or mid-answer, reveals. Fail-fast retrieval
-  // practice: a half-typed answer you're deriving is still a freeze.
+  // Memorise shot clock: a HARD deadline per question. The window is the
+  // total budget to place the complete answer — measured from the prompt,
+  // never extended by typing. Not done in time ⇒ the answer reveals, scored
+  // as a skip. Answering first wins the race: advance() swaps the question
+  // and this effect's cleanup clears the pending timer.
   useEffect(() => {
     if (!memorise || phase !== 'running' || revealed !== null || question === null) return;
     const t = setTimeout(() => surrender(true), store.settings.memoriseMs);
     return () => clearTimeout(t);
-  }, [memorise, phase, revealed, question, input, store.settings.memoriseMs, surrender]);
+  }, [memorise, phase, revealed, question, store.settings.memoriseMs, surrender]);
 
   const abort = useCallback(() => {
     // Sim rule: Esc aborts with confirm and DISCARDS the session — no pause.

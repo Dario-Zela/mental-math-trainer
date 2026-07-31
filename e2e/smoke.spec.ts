@@ -173,7 +173,7 @@ test('chain blitz: the next prompt wraps the answer you just gave', async ({ pag
   await page.keyboard.press('Escape');
 });
 
-test('memorise mode: the shot clock catches stalls before AND during typing', async ({ page }) => {
+test('memorise mode: the shot clock is a hard per-question deadline', async ({ page }) => {
   await page.goto('/mental-math-trainer/');
   await expect(page.locator('.mode-row').first()).toBeVisible();
   await page.locator('#memorise-toggle').check();
@@ -188,8 +188,7 @@ test('memorise mode: the shot clock catches stalls before AND during typing', as
   await page.keyboard.press('Enter');
   await expect(page.locator('.entry')).toBeVisible();
 
-  // mid-answer stall: one keystroke re-arms the clock but does not disarm it —
-  // deriving behind a half-typed answer is still a freeze
+  // typing does NOT buy time: the deadline is absolute from the prompt
   await page.keyboard.type('1');
   await expect(page.getByText('⏱ shot clock — read it, say it, move on')).toBeVisible({ timeout: 3000 });
 

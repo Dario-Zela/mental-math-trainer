@@ -197,7 +197,7 @@ export function Home({ onStart }: { onStart(config: SessionConfig): void }) {
               }}
               style={{ width: '4.2rem' }}
             />
-            <span className="micro">s of no typing</span>
+            <span className="micro">s to place the full answer</span>
           </div>
         </div>
 
