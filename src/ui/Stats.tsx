@@ -7,7 +7,7 @@ import { FERMI_BUCKETS, OPERAND_CLASSES, type Op } from '../core/questions';
 import { weakness, type BucketStats } from '../core/buckets';
 import { WEAKNESS_MAX } from '../core/scheduler';
 import { importJSON } from '../store/persist';
-import { allTimeTotals, loadHistory, weeklyTrend, type HistoryRow, type WeekPoint } from '../store/history';
+import { allTimeTotals, lastNSessions, loadHistory, reviewsCSV, weeklyTrend, type HistoryRow, type WeekPoint } from '../store/history';
 import type { SessionSummary } from '../core/session';
 import demoData from './demo-data.json';
 
@@ -308,6 +308,7 @@ function TrendChart({ points }: { points: WeekPoint[] }) {
 function History() {
   const [rows, setRows] = useState<HistoryRow[] | null | 'loading'>('loading');
   const [bucket, setBucket] = useState<string>('');
+  const [reviewN, setReviewN] = useState(10);
 
   useEffect(() => {
     void loadHistory().then((r) => {
@@ -346,6 +347,37 @@ function History() {
           <span className="micro">Time answering</span>
           <span className="num">{totals.hours < 1 ? `${Math.round(totals.hours * 60)}m` : `${totals.hours.toFixed(1)}h`}</span>
         </div>
+      </div>
+      <div className="field-row">
+        <label className="micro" htmlFor="review-n">Export reviews of the past</label>
+        <input
+          id="review-n"
+          type="number"
+          min={1}
+          max={100}
+          value={reviewN}
+          onChange={(e) => setReviewN(Math.max(1, Math.min(100, Number(e.target.value) || 1)))}
+          style={{ width: '4.5rem' }}
+        />
+        <span className="micro">rounds</span>
+        <button
+          type="button"
+          className="btn"
+          onClick={() => {
+            const exported = lastNSessions(rows, reviewN).length;
+            const blob = new Blob([reviewsCSV(rows, reviewN)], { type: 'text/csv' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `mental-math-reviews-last${exported}-${new Date().toISOString().slice(0, 10)}.csv`;
+            a.click();
+            URL.revokeObjectURL(a.href);
+          }}
+        >
+          Export CSV
+        </button>
+        <span className="micro">
+          one row per question — sort by prompt in a spreadsheet and the same fact's times line up across rounds
+        </span>
       </div>
       <div className="field-row">
         <label className="micro" htmlFor="trend-bucket">Weekly trend for</label>

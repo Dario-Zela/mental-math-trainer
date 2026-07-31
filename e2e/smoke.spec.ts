@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
@@ -69,6 +70,16 @@ test('stats persist in localStorage across reload; IDB history accumulates', asy
   await expect(page.getByText('Questions all-time')).toBeVisible();
   const count = Number(await page.locator('.result-grid .cell').first().locator('.num').textContent());
   expect(count).toBeGreaterThan(0);
+
+  // reviews export: the CSV downloads and contains a per-question line
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export CSV' }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toMatch(/^mental-math-reviews-last1-/);
+  const content = await readFile(await download.path(), 'utf8');
+  expect(content.split('\n')[0]).toBe('round,started,mode,question,bucket,prompt,given,answer,verdict,ms,first_key_ms');
+  expect(content).toContain('1,'); // at least one data row for round 1
+  expect(content.split('\n').length).toBeGreaterThan(count); // every question exported
 });
 
 test('keyboard launch from home starts the benchmark sprint', async ({ page }) => {

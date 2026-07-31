@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { allTimeTotals, historyRows, weeklyTrend, weekStartUTC, type HistoryRow } from './history';
+import { allTimeTotals, historyRows, lastNSessions, reviewsCSV, weeklyTrend, weekStartUTC, type HistoryRow } from './history';
 import type { SessionSummary } from '../core/session';
 import { rat } from '../core/rational';
 
@@ -52,6 +52,49 @@ describe('history aggregations (pure)', () => {
     expect(t.hours).toBeCloseTo(1);
   });
 
+  it('lastNSessions groups by session, orders by start time, takes the tail', () => {
+    const rows = [
+      row({ sessionId: 'b', ts: 200, prompt: 'b1' }),
+      row({ sessionId: 'a', ts: 100, prompt: 'a1' }),
+      row({ sessionId: 'a', ts: 100, prompt: 'a2' }),
+      row({ sessionId: 'c', ts: 300, prompt: 'c1' }),
+    ];
+    const last2 = lastNSessions(rows, 2);
+    expect(last2.map((s) => s.map((r) => r.prompt))).toEqual([['b1'], ['c1']]);
+    // question order within a session is preserved
+    expect(lastNSessions(rows, 3)[0]?.map((r) => r.prompt)).toEqual(['a1', 'a2']);
+    expect(lastNSessions(rows, 99)).toHaveLength(3); // n larger than history: everything
+  });
+
+  it('reviewsCSV: one line per question, rounds numbered oldest-first, commas escaped', () => {
+    const rows = [
+      row({ sessionId: 's1', ts: Date.parse('2026-07-30T10:00:00Z'), prompt: '7 × 8', given: '56', answer: '56', ms: 1500, firstKeyMs: 900 }),
+      row({
+        sessionId: 's2', ts: Date.parse('2026-07-31T10:00:00Z'), mode: 'fermi',
+        prompt: '48,213 × 677', given: null, verdict: 'skip', ms: null, firstKeyMs: null, answer: '32640201',
+      }),
+    ];
+    const csv = reviewsCSV(rows, 5);
+    const lines = csv.trim().split('\n');
+    expect(lines[0]).toBe('round,started,mode,question,bucket,prompt,given,answer,verdict,ms,first_key_ms');
+    expect(lines[1]).toBe('1,2026-07-30T10:00:00.000Z,zetamac,1,mul:2x2,7 × 8,56,56,correct,1500,900');
+    // the fermi prompt's thousands-comma is quoted, nulls become empty fields
+    expect(lines[2]).toBe('2,2026-07-31T10:00:00.000Z,fermi,1,mul:2x2,"48,213 × 677",,32640201,skip,,');
+    // legacy rows without the answer field export an empty column, not "undefined"
+    const legacy = reviewsCSV([row({ answer: undefined })], 1);
+    expect(legacy).not.toContain('undefined');
+  });
+
+  it('reviewsCSV with n=1 exports exactly the latest round', () => {
+    const rows = [
+      row({ sessionId: 'old', ts: 100, prompt: 'old q' }),
+      row({ sessionId: 'new', ts: 200, prompt: 'new q' }),
+    ];
+    const csv = reviewsCSV(rows, 1);
+    expect(csv).toContain('new q');
+    expect(csv).not.toContain('old q');
+  });
+
   it('historyRows flattens a session log against its summary', () => {
     const summary = {
       id: 'sess-9', startedAt: 123, mode: 'optiver',
@@ -68,6 +111,7 @@ describe('history aggregations (pure)', () => {
     expect(rows).toEqual([{
       sessionId: 'sess-9', ts: 123, mode: 'optiver', bucketId: 'mul:2x2',
       prompt: '12 × 34', given: null, verdict: 'skip', ms: null, firstKeyMs: null,
+      answer: '408', // canonical answer travels with the row for review exports
     }]);
   });
 });

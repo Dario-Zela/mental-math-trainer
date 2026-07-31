@@ -10,6 +10,7 @@
  */
 import type { Mode } from '../core/scoring';
 import type { QuestionRecord, SessionSummary } from '../core/session';
+import { answerDisplay } from '../core/tricks';
 
 export interface HistoryRow {
   sessionId: string;
@@ -21,6 +22,8 @@ export interface HistoryRow {
   verdict: string;
   ms: number | null;
   firstKeyMs: number | null;
+  /** Canonical answer display — absent on rows written before this field existed. */
+  answer?: string;
 }
 
 const DB_NAME = 'mmt-history';
@@ -58,6 +61,7 @@ export function historyRows(summary: SessionSummary, log: QuestionRecord[]): His
     verdict: r.verdict,
     ms: r.ms,
     firstKeyMs: r.firstKeyMs,
+    answer: answerDisplay(r.spec),
   }));
 }
 
@@ -158,4 +162,56 @@ export function allTimeTotals(rows: HistoryRow[]): AllTimeTotals {
 
 export function exportHistoryJSON(rows: HistoryRow[]): string {
   return JSON.stringify({ format: 'mmt-history-v1', rows }, null, 2);
+}
+
+/**
+ * The last n sessions' rows, grouped per session, oldest exported round first.
+ * Within a session, rows keep question order (loadHistory's sort is stable
+ * over the insertion-ordered getAll).
+ */
+export function lastNSessions(rows: HistoryRow[], n: number): HistoryRow[][] {
+  const bySession = new Map<string, HistoryRow[]>();
+  for (const r of rows) {
+    const group = bySession.get(r.sessionId);
+    if (group) group.push(r);
+    else bySession.set(r.sessionId, [r]);
+  }
+  return [...bySession.values()]
+    .sort((a, b) => (a[0] as HistoryRow).ts - (b[0] as HistoryRow).ts)
+    .slice(-Math.max(1, n));
+}
+
+function csvField(v: string | number | null | undefined): string {
+  if (v === null || v === undefined) return '';
+  const s = String(v);
+  // fermi prompts contain commas ("48,213 × 677") — quote anything unsafe
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+/**
+ * Full reviews of the past n rounds as CSV — one row per question, built for
+ * side-by-side comparison: sort by `prompt` in any spreadsheet and the same
+ * fact's times across rounds line up.
+ */
+export function reviewsCSV(rows: HistoryRow[], n: number): string {
+  const header = 'round,started,mode,question,bucket,prompt,given,answer,verdict,ms,first_key_ms';
+  const lines = [header];
+  lastNSessions(rows, n).forEach((session, i) => {
+    session.forEach((r, q) => {
+      lines.push([
+        i + 1,
+        new Date(r.ts).toISOString(),
+        r.mode,
+        q + 1,
+        r.bucketId,
+        csvField(r.prompt),
+        csvField(r.given),
+        csvField(r.answer),
+        r.verdict,
+        r.ms === null ? '' : Math.round(r.ms),
+        r.firstKeyMs === null ? '' : Math.round(r.firstKeyMs),
+      ].join(','));
+    });
+  });
+  return lines.join('\n') + '\n';
 }
