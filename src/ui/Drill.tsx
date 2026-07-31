@@ -47,6 +47,9 @@ export function Drill({ config, onExit, onRestart }: DrillProps) {
   // memorise mode implies coaching: recall stalls auto-reveal on the shot clock
   const memorise = store.settings.memorise && rules.mode === 'focus';
   const coach = (store.settings.coach || memorise) && rules.mode === 'focus';
+  // memorise answers auto-accept on match, blitz-style: Enter is not part of
+  // answering, so it can never race the shot-clock reveal
+  const autoAccept = rules.autoAdvance || memorise;
   const blitz = isBlitz(config);
   const [revealed, setRevealed] = useState<{ spec: QuestionSpec; verdict: Verdict; auto?: boolean } | null>(null);
 
@@ -57,6 +60,7 @@ export function Drill({ config, onExit, onRestart }: DrillProps) {
   const voidedRef = useRef(false);      // focus loss voided this question's timing (untimed only)
   const maxHandlerRef = useRef(0);      // hot-handler budget, measured (README micro-perf story)
   const startedRef = useRef(false);
+  const revealedAtRef = useRef(0);      // reveal grace: an in-flight Enter must not dismiss the answer
 
   const advance = useCallback(() => {
     const q = session.next(Date.now());
@@ -166,6 +170,7 @@ export function Drill({ config, onExit, onRestart }: DrillProps) {
       }
       setLastVerdict({ verdict, ms: rawMs });
       if (coach && verdict === 'wrong' && spec) {
+        revealedAtRef.current = performance.now();
         setRevealed({ spec, verdict }); // study pause: Enter continues
         return;
       }
@@ -183,6 +188,7 @@ export function Drill({ config, onExit, onRestart }: DrillProps) {
     session.answer(null, null, null);
     if (store.settings.sound) sounds.buzz();
     setLastVerdict({ verdict: 'skip', ms: 0 });
+    revealedAtRef.current = performance.now();
     setRevealed({ spec, verdict: 'skip', auto });
   }, [session, store.settings.sound]);
 
@@ -221,6 +227,9 @@ export function Drill({ config, onExit, onRestart }: DrillProps) {
       if (revealed) {
         if (e.key === 'Enter') {
           e.preventDefault();
+          // grace period: a reflex Enter arriving just as the answer reveals
+          // must not skip the thing this mode exists to show
+          if (performance.now() - revealedAtRef.current < 400) return;
           setRevealed(null);
           advance();
         } else if (e.key === 'Escape') {
@@ -248,7 +257,7 @@ export function Drill({ config, onExit, onRestart }: DrillProps) {
       }
       if (e.key === 'Enter') {
         e.preventDefault();
-        if (rules.autoAdvance) return; // Zetamac parity: Enter does nothing
+        if (autoAccept) return; // zetamac parity / memorise: Enter plays no part in answering
         if (input === '') {
           if (rules.allowSkip) submit(null, e.timeStamp);
         } else if (parseAnswer(input) !== null && rules.allowWrongSubmit) {
@@ -266,11 +275,11 @@ export function Drill({ config, onExit, onRestart }: DrillProps) {
       setInput(next);
       // auto-advance: parse after every keystroke, fire the instant it matches.
       // Inherits Zetamac's prefix quirk (12 fires while typing 123) — deliberate.
-      if (rules.autoAdvance && matches(next, question.answer, question.grading)) submit(next, e.timeStamp);
+      if (autoAccept && matches(next, question.answer, question.grading)) submit(next, e.timeStamp);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [phase, input, question, rules, submit, abort, finish, revealed, coach, surrender, advance, blitz, restart]);
+  }, [phase, input, question, rules, submit, abort, finish, revealed, coach, surrender, advance, blitz, restart, autoAccept, memorise, store.settings.memoriseMs]);
 
   if (phase === 'done' && applied) {
     return (
@@ -367,8 +376,15 @@ export function Drill({ config, onExit, onRestart }: DrillProps) {
         <span>
           {revealed
             ? <><kbd>Enter</kbd> next question</>
-            : rules.autoAdvance
-              ? <>type the answer — it advances itself{blitz && <> · <kbd>r</kbd> restart</>}</>
+            : autoAccept
+              ? (
+                <>
+                  type the answer — it accepts itself
+                  {blitz && <> · <kbd>r</kbd> restart</>}
+                  {coach && !rules.autoAdvance && <> · <kbd>h</kbd> show it</>}
+                  {memorise && <> · ⏱ {(store.settings.memoriseMs / 1000).toFixed(1)}s deadline</>}
+                </>
+              )
               : rules.allowSkip
                 ? (
                   <>

@@ -185,14 +185,26 @@ test('memorise mode: the shot clock is a hard per-question deadline', async ({ p
   // stall from the start — no keystroke within the window → reveal, scored as a skip
   await expect(page.getByText('⏱ shot clock — read it, say it, move on')).toBeVisible({ timeout: 3000 });
   await expect(page.locator('.reveal .steps li').first()).toBeVisible();
+  await page.keyboard.press('Enter'); // inside the reveal grace: must NOT advance
+  await expect(page.locator('.reveal')).toBeVisible();
+  await page.waitForTimeout(450);
   await page.keyboard.press('Enter');
   await expect(page.locator('.entry')).toBeVisible();
 
   // typing does NOT buy time: the deadline is absolute from the prompt
   await page.keyboard.type('1');
   await expect(page.getByText('⏱ shot clock — read it, say it, move on')).toBeVisible({ timeout: 3000 });
-
+  await page.waitForTimeout(450); // reveal grace: an in-flight Enter must not skip the answer
   await page.keyboard.press('Enter');
+  await expect(page.locator('.entry')).toBeVisible();
+
+  // answers auto-accept on match, blitz-style — Enter never races the reveal
+  const prompt = (await page.locator('.prompt').textContent())!.replace(/[a-z— ]+$/, '').trim();
+  const m = prompt.replace('×', '*').replace('−', '-').match(/^(\d+) ([*+-]) (\d+)$/) as RegExpMatchArray;
+  const v = m[2] === '*' ? Number(m[1]) * Number(m[3]) : m[2] === '+' ? Number(m[1]) + Number(m[3]) : Number(m[1]) - Number(m[3]);
+  await page.keyboard.type(String(v), { delay: 20 }); // no Enter
+  await expect(page.getByText('✓ correct', { exact: false })).toBeVisible({ timeout: 1000 });
+
   await page.keyboard.press('Escape'); // focus drill: ends and saves
   await expect(page.locator('.results .score')).toBeVisible();
 });
