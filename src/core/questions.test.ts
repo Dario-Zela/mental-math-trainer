@@ -7,7 +7,7 @@ import {
 } from './questions';
 import { type Rational, rat, ratAdd, ratSub, ratMul, ratDiv, ratEq, isInteger, isTerminating, decimalPlaces } from './rational';
 
-const EVERY_BUCKET = [...ALL_BUCKETS, ...ZETA_BUCKETS, ...FERMI_BUCKETS];
+const EVERY_BUCKET = [...ALL_BUCKETS, ...ZETA_BUCKETS, ...FERMI_BUCKETS, 'chain:mix'];
 
 /**
  * Independent evaluator: parse the prompt string back into an expression and
@@ -35,6 +35,19 @@ function evalPrompt(spec: QuestionSpec): Rational {
     return rat(parseInt(s, 10));
   };
   const p = spec.prompt;
+  // chains are strictly left-associative: strip the parens and fold
+  if (spec.op === 'chain') {
+    const tokens = p.replace(/[()]/g, '').split(' ').filter((t) => t.length > 0);
+    let v = num(tokens[0] as string);
+    for (let i = 1; i < tokens.length; i += 2) {
+      const o = num(tokens[i + 1] as string);
+      v = tokens[i] === TIMES ? ratMul(v, o)
+        : tokens[i] === MINUS ? ratSub(v, o)
+        : tokens[i] === DIVIDE ? ratDiv(v, o)
+        : ratAdd(v, o);
+    }
+    return v;
+  }
   // missing-operand: a × ? = b — the answer IS the hidden operand, b ÷ a
   const missing = p.match(new RegExp(`^([\\d.]+) ${TIMES} \\? = ([\\d.]+)$`));
   if (missing) return ratDiv(num(missing[2] as string), num(missing[1] as string));
@@ -108,7 +121,9 @@ describe('generators', () => {
     expect(CODEC_BUCKETS.slice(23, 27)).toEqual([...ZETA_BUCKETS]);
     expect(CODEC_BUCKETS[22]).toBe('recip:term');
     expect(CODEC_BUCKETS.indexOf('recip:rep')).toBe(27);
-    expect(CODEC_BUCKETS.slice(31)).toEqual(['missing:mul', 'dec_add:2dp', 'dec_div:1dp', 'mul:1x1']);
+    expect(CODEC_BUCKETS.slice(31)).toEqual([
+      'missing:mul', 'dec_add:2dp', 'dec_div:1dp', 'mul:1x1', 'add:1d1d', 'sub:1d1d', 'chain:mix',
+    ]);
     for (const b of EVERY_BUCKET) expect(CODEC_BUCKETS).toContain(b);
     expect(new Set(CODEC_BUCKETS).size).toBe(CODEC_BUCKETS.length);
   });
@@ -168,6 +183,7 @@ describe('generators', () => {
     const RANGES: Record<string, [number, number][]> = {
       'add:2d2d': [[10, 99], [10, 99]],
       'add:3d3d': [[100, 999], [100, 999]],
+      'add:1d1d': [[2, 9], [2, 9]],
       'mul:1x1': [[2, 9], [2, 9]],
       'mul:1x2': [[2, 9], [10, 99]],
       'mul:2x2': [[10, 99], [10, 99]],

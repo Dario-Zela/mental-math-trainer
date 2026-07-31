@@ -32,6 +32,8 @@ export interface StoreV2 {
     sound: boolean;
     /** Coach mode in focus drills: worked solutions on misses, 'h' to reveal. Additive field, defaults off. */
     coach: boolean;
+    /** Which blitz the home row launches. Additive field, defaults to times tables. */
+    blitzType: 'mul' | 'add' | 'sub' | 'chain';
   };
   buckets: Record<string, BucketStats>;
   sessions: SessionSummary[];
@@ -56,6 +58,7 @@ export function freshStore(): StoreV2 {
       targetScore: null,
       sound: true,
       coach: false,
+      blitzType: 'mul',
     },
     buckets: {},
     sessions: [],
@@ -116,6 +119,9 @@ function sanitise(raw: Record<string, unknown>): StoreV2 {
   }
   if (typeof settings.sound === 'boolean') out.settings.sound = settings.sound;
   if (typeof settings.coach === 'boolean') out.settings.coach = settings.coach;
+  if (isStr(settings.blitzType) && ['mul', 'add', 'sub', 'chain'].includes(settings.blitzType)) {
+    out.settings.blitzType = settings.blitzType as 'mul' | 'add' | 'sub' | 'chain';
+  }
 
   if (isObj(raw.buckets)) {
     for (const [k, v] of Object.entries(raw.buckets)) {

@@ -123,6 +123,11 @@ export const TECHNIQUES: Technique[] = [
     detail: '66 × ? = 138.6 → ? = 138.6 ÷ 66. Scale away the decimal (1386 ÷ 66 = 21) and restore it → 2.1. The format flusters people; the arithmetic is ordinary division.',
   },
   {
+    id: 'running-total', name: 'Hold the running total', practiceBucket: 'chain:mix',
+    summary: 'Each step wraps your last answer — never recompute from scratch.',
+    detail: '((7 × 8) − 3) ÷ 2: you already answered 7 × 8 = 56 and (7 × 8) − 3 = 53 in the previous steps, so the only new work is 53 ÷ 2 — except the numbers are built so it divides cleanly. Hold ONE running number and apply one operation; re-reading the whole expression from scratch is the trap.',
+  },
+  {
     id: 'round-adjust', name: 'Round, multiply, adjust', practiceBucket: 'fermi:mul',
     summary: 'Round to 2 significant figures, then correct by the % you moved.',
     detail: '48,213 × 677 ≈ 48,000 × 677 = 32.5M; you rounded 48,213 down by ~0.4%, so nudge the answer up ~0.4%. One rounding, one easy multiply, one percentage correction lands inside ±5%.',
@@ -669,6 +674,25 @@ function explainMissing(spec: QuestionSpec): Explanation {
   return { techniqueId: 'division-in-disguise', steps };
 }
 
+/** Chain: strip the parens and fold left-to-right — the nesting is left-associative. */
+function explainChain(spec: QuestionSpec): Explanation {
+  const tokens = spec.prompt.replace(/[()]/g, '').split(' ').filter((t) => t.length > 0);
+  let value = parseInt(tokens[0] as string, 10);
+  const steps: string[] = [];
+  for (let i = 1; i < tokens.length; i += 2) {
+    const sym = tokens[i] as string;
+    const operand = parseInt(tokens[i + 1] as string, 10);
+    const next =
+      sym === TIMES ? value * operand :
+      sym === MINUS ? value - operand :
+      sym === DIVIDE ? value / operand :
+      value + operand;
+    steps.push(`${value} ${sym} ${operand} = ${next}`);
+    value = next;
+  }
+  return { techniqueId: 'running-total', steps };
+}
+
 /** Round to 2 significant figures. */
 function round2sf(x: number): number {
   const mag = Math.pow(10, Math.floor(Math.log10(Math.abs(x))) - 1);
@@ -746,6 +770,7 @@ export function explain(spec: QuestionSpec): Explanation {
     case 'pct_change': return explainPctChange(spec);
     case 'recip': return explainRecip(spec);
     case 'missing': return explainMissing(spec);
+    case 'chain': return explainChain(spec);
     case 'fermi': return explainFermi(spec);
     default: throw new Error(`no explainer for ${spec.op satisfies never}`);
   }

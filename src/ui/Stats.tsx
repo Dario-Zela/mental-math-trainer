@@ -176,7 +176,7 @@ function HeatCell({ id, stats }: { id: string; stats: BucketStats | undefined })
 }
 
 function Heatmap({ buckets }: { buckets: Record<string, BucketStats> }) {
-  const ops = Object.keys(OPERAND_CLASSES) as Exclude<Op, 'fermi'>[];
+  const ops = Object.keys(OPERAND_CLASSES) as Exclude<Op, 'fermi' | 'chain'>[];
   const hasZeta = (op: Op) => ['add', 'sub', 'mul', 'div'].includes(op);
   return (
     // scrollable on narrow screens, so it must be keyboard-reachable
@@ -208,6 +208,11 @@ function Heatmap({ buckets }: { buckets: Record<string, BucketStats> }) {
             {FERMI_BUCKETS.map((b) => <HeatCell key={b} id={b} stats={buckets[b]} />)}
             <td aria-hidden="true" />
             <td aria-hidden="true" />
+          </tr>
+          <tr>
+            <th scope="row" style={{ textAlign: 'left' }}>{OP_LABELS.chain}</th>
+            <HeatCell id="chain:mix" stats={buckets['chain:mix']} />
+            <td aria-hidden="true" /><td aria-hidden="true" /><td aria-hidden="true" /><td aria-hidden="true" />
           </tr>
         </tbody>
       </table>

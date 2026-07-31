@@ -14,6 +14,7 @@ export const OP_LABELS: Record<Op, string> = {
   pct_change: 'Percent change',
   recip: 'Reciprocals',
   missing: 'Missing operand',
+  chain: 'Chain',
   fermi: 'Fermi ≈',
 };
 
@@ -22,9 +23,11 @@ export const CLASS_LABELS: Record<string, string> = {
   'missing:mul': 'a × ? = b',
   'dec_add:2dp': 'two decimal places',
   'dec_div:1dp': 'decimal divisor',
+  'chain:mix': 'progressive ×−÷+',
   '2d2d': '2-digit ± 2-digit',
   '3d2d': '3-digit ± 2-digit',
   '3d3d': '3-digit ± 3-digit',
+  '1d1d': '1-digit recall',
   '1x1': 'times tables (1×1)',
   '1x2': '1×2 digit',
   '2x2': '2×2 digit',

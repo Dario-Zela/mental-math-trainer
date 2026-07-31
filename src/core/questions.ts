@@ -18,6 +18,7 @@ export type Op =
   | 'dec_mul' | 'dec_add' | 'dec_div'
   | 'pct_of' | 'pct_change' | 'recip'
   | 'missing'
+  | 'chain'
   | 'fermi';
 
 /**
@@ -49,9 +50,9 @@ export const ARROW = '→'; // →
  * mode; fermi has no entry here because its tolerance grading must never leak
  * into exact-graded custom sprints — it lives in FERMI_BUCKETS and its own mode.
  */
-export const OPERAND_CLASSES: Record<Exclude<Op, 'fermi'>, string[]> = {
-  add: ['2d2d', '3d2d', '3d3d'],
-  sub: ['2d2d', '3d2d', '3d3d'],
+export const OPERAND_CLASSES: Record<Exclude<Op, 'fermi' | 'chain'>, string[]> = {
+  add: ['1d1d', '2d2d', '3d2d', '3d3d'],
+  sub: ['1d1d', '2d2d', '3d2d', '3d3d'],
   mul: ['1x1', '1x2', '2x2', '1x3'],
   div: ['1x2', '2x2', '1x3'],
   frac_add: ['small', 'any'],
@@ -67,6 +68,16 @@ export const OPERAND_CLASSES: Record<Exclude<Op, 'fermi'>, string[]> = {
 
 export const ZETA_BUCKETS = ['add:zeta', 'sub:zeta', 'mul:zeta', 'div:zeta'] as const;
 export const FERMI_BUCKETS = ['fermi:mul', 'fermi:div', 'fermi:pct'] as const;
+
+export const CHAIN_BUCKET = 'chain:mix';
+
+/** The blitz round's selectable buckets: bare 1-digit recall plus the chain. */
+export const BLITZ_BUCKETS: Record<string, string> = {
+  mul: 'mul:1x1',
+  add: 'add:1d1d',
+  sub: 'sub:1d1d',
+  chain: CHAIN_BUCKET,
+};
 
 /**
  * The Optiver sim's locked question mix — matched to what candidate accounts
@@ -88,7 +99,7 @@ export const OPTIVER_BUCKETS = [
 ] as const;
 
 /** Every custom-drill bucket, in UI order. */
-export const ALL_BUCKETS: string[] = (Object.keys(OPERAND_CLASSES) as Exclude<Op, 'fermi'>[]).flatMap((op) =>
+export const ALL_BUCKETS: string[] = (Object.keys(OPERAND_CLASSES) as Exclude<Op, 'fermi' | 'chain'>[]).flatMap((op) =>
   OPERAND_CLASSES[op].map((c) => `${op}:${c}`),
 );
 
@@ -114,6 +125,7 @@ export const CODEC_BUCKETS: string[] = [
   'fermi:mul', 'fermi:div', 'fermi:pct',
   'missing:mul', 'dec_add:2dp', 'dec_div:1dp',
   'mul:1x1',
+  'add:1d1d', 'sub:1d1d', 'chain:mix',
 ];
 
 export function bucketOp(bucketId: string): Op {
@@ -129,6 +141,7 @@ export function bucketClass(bucketId: string): string {
 // ---------------------------------------------------------------------------
 
 const ADD_RANGES: Record<string, [[number, number], [number, number]]> = {
+  '1d1d': [[2, 9], [2, 9]], // bare 1-digit recall — the substrate under every carry and borrow
   '2d2d': [[10, 99], [10, 99]],
   '3d2d': [[100, 999], [10, 99]],
   '3d3d': [[100, 999], [100, 999]],
@@ -357,6 +370,66 @@ function genFermi(cls: string, rng: Rng): { prompt: string; answer: Rational } {
 // Entry point
 // ---------------------------------------------------------------------------
 
+/**
+ * One chain cycle: five questions where each wraps the previous expression in
+ * parentheses and applies one more operation to the answer you just gave —
+ * 7 × 8 → (7 × 8) − 3 → ((7 × 8) − 3) ÷ 2 → … The nesting is strictly
+ * left-associative, so standard precedence reads each prompt correctly.
+ * Every intermediate is a small positive integer by construction: the
+ * subtrahend and divisor are chosen together so the division is always exact
+ * with quotient ≥ 2, and the final × is capped to keep the answer ≤ ~300.
+ */
+export interface ChainCycle {
+  prompts: string[];
+  answers: number[];
+}
+
+export const CHAIN_LENGTH = 5;
+
+export function generateChain(rng: Rng): ChainCycle {
+  let a = randInt(rng, 2, 9);
+  let b = randInt(rng, 2, 9);
+  while (a * b < 12) { // headroom for the − and ÷ steps
+    a = randInt(rng, 2, 9);
+    b = randInt(rng, 2, 9);
+  }
+  const v1 = a * b;
+  // pick (divisor, subtrahend) together: (v1 − k) divisible by d, quotient ≥ 2
+  const options: Array<[number, number]> = [];
+  for (let d = 2; d <= 8; d++) {
+    for (let k = 2; k <= 9; k++) {
+      if ((v1 - k) % d === 0 && (v1 - k) / d >= 2) options.push([d, k]);
+    }
+  }
+  const [d, k] = options[Math.floor(rng() * options.length)] as [number, number];
+  const v2 = v1 - k;
+  const v3 = v2 / d;
+  const e = randInt(rng, 2, 9);
+  const v4 = v3 + e;
+  const f = randInt(rng, 2, Math.max(2, Math.min(9, Math.floor(300 / v4))));
+  const v5 = v4 * f;
+
+  const p1 = `${a} ${TIMES} ${b}`;
+  const p2 = `(${p1}) ${MINUS} ${k}`;
+  const p3 = `(${p2}) ${DIVIDE} ${d}`;
+  const p4 = `(${p3}) + ${e}`;
+  const p5 = `(${p4}) ${TIMES} ${f}`;
+  return { prompts: [p1, p2, p3, p4, p5], answers: [v1, v2, v3, v4, v5] };
+}
+
+/** Build the QuestionSpec for one step of a chain cycle. */
+export function chainSpec(cycle: ChainCycle, idx: number, now: number): QuestionSpec {
+  return {
+    op: 'chain',
+    operandClass: 'mix',
+    bucketId: CHAIN_BUCKET,
+    prompt: cycle.prompts[idx] as string,
+    answer: rat(cycle.answers[idx] as number),
+    grading: 'exact',
+    generatedAt: now,
+  };
+}
+
 export function gradingFor(bucketId: string): Grading {
   if (bucketId.startsWith('fermi:')) return 'rel5';
   if (bucketId === 'recip:rep') return 'sig3';
@@ -378,6 +451,10 @@ function generateOnce(bucketId: string, rng: Rng, now: number, difficulty: numbe
     case 'pct_change': q = genPctChange(cls, rng); break;
     case 'recip': q = genRecip(cls, rng); break;
     case 'missing': q = genMissing(rng); break;
+    case 'chain': {
+      const cycle = generateChain(rng);
+      return chainSpec(cycle, 2, now); // a 3-op prefix reads best standalone
+    }
     case 'fermi': q = genFermi(cls, rng); break;
     default: throw new Error(`unknown op ${op satisfies never}`);
   }

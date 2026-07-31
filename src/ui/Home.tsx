@@ -3,7 +3,7 @@ import { useStore } from './storeContext';
 import { bucketLabel } from './labels';
 import { makeConfig, type SessionConfig } from '../core/session';
 import { activeProfile, PROFILES } from '../core/presets';
-import { FERMI_BUCKETS, OPTIVER_BUCKETS, ZETA_BUCKETS } from '../core/questions';
+import { BLITZ_BUCKETS, FERMI_BUCKETS, OPTIVER_BUCKETS, ZETA_BUCKETS } from '../core/questions';
 import { randomSeed } from '../core/rng';
 import { ZETAMAC_DEFAULT_SEC } from '../core/scoring';
 
@@ -35,8 +35,9 @@ export function Home({ onStart }: { onStart(config: SessionConfig): void }) {
     } else if (mode === 'fermi') {
       onStart(makeConfig('fermi', [...FERMI_BUCKETS], store.buckets, seed));
     } else if (mode === 'blitz') {
-      // times-tables blitz: a fixed 60s auto-advance preset over the 1×1 bucket
-      onStart(makeConfig('zetamac', ['mul:1x1'], store.buckets, seed, 60));
+      // 60s auto-advance over the selected 1-digit-recall (or chain) bucket
+      const bucket = BLITZ_BUCKETS[store.settings.blitzType] ?? 'mul:1x1';
+      onStart(makeConfig('zetamac', [bucket], store.buckets, seed, 60));
     } else {
       onStart(makeConfig('focus', [effectiveFocus], store.buckets, seed));
     }
@@ -148,13 +149,31 @@ export function Home({ onStart }: { onStart(config: SessionConfig): void }) {
         <button type="button" className="mode-row" onClick={() => start('blitz')}>
           <span className="key" aria-hidden="true">6</span>
           <span>
-            <span className="name">Times-tables blitz</span>
-            <span className="desc">One minute of bare 1×1 recall — the foundation every other trick stands on. Fumbled? <strong>r</strong> restarts instantly.</span>
+            <span className="name">Blitz — {({ mul: 'times tables', add: '1-digit addition', sub: '1-digit subtraction', chain: 'progressive chain' })[store.settings.blitzType]}</span>
+            <span className="desc">
+              One minute of bare recall — or chains that build on your last answer. Fumbled? <strong>r</strong> restarts instantly.
+            </span>
           </span>
           <span className="meta">60s · +1 · auto-advance</span>
         </button>
       </div>
       <div className="focus-picker">
+        <label className="micro" htmlFor="blitz-pick">Blitz</label>
+        <select
+          id="blitz-pick"
+          value={store.settings.blitzType}
+          onChange={(e) =>
+            update((s) => ({
+              ...s,
+              settings: { ...s.settings, blitzType: e.target.value as 'mul' | 'add' | 'sub' | 'chain' },
+            }))
+          }
+        >
+          <option value="mul">× times tables</option>
+          <option value="add">+ 1-digit addition</option>
+          <option value="sub">− 1-digit subtraction</option>
+          <option value="chain">⛓ progressive chain</option>
+        </select>
         <label className="micro" htmlFor="profile-pick">Profile</label>
         <select id="profile-pick" value={profile?.id ?? 'custom'} onChange={(e) => applyProfile(e.target.value)}>
           {PROFILES.map((p) => (

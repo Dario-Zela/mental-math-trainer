@@ -157,12 +157,51 @@ describe('benchmark detection & weight snapshots', () => {
     expect(isBenchmark(makeConfig('optiver', [...ZETA_BUCKETS], {}, 1))).toBe(false);
   });
 
-  it('blitz detection: zetamac mode with exactly the 1x1 bucket', () => {
-    expect(isBlitz(makeConfig('zetamac', ['mul:1x1'], {}, 1, 60))).toBe(true);
+  it('blitz detection: zetamac mode with exactly one 1-digit-recall or chain bucket', () => {
+    for (const b of ['mul:1x1', 'add:1d1d', 'sub:1d1d', 'chain:mix']) {
+      expect(isBlitz(makeConfig('zetamac', [b], {}, 1, 60))).toBe(true);
+    }
     expect(isBlitz(makeConfig('zetamac', ['mul:1x1'], {}, 1, 120))).toBe(true); // duration-agnostic
     expect(isBlitz(makeConfig('focus', ['mul:1x1'], {}, 1))).toBe(false);
     expect(isBlitz(makeConfig('zetamac', ['mul:1x2'], {}, 1, 60))).toBe(false);
     expect(isBlitz(makeConfig('zetamac', ['mul:1x1', 'mul:1x2'], {}, 1, 60))).toBe(false);
+  });
+
+  it('chain blitz: each question wraps the previous, resets after five, stays deterministic', () => {
+    const config = makeConfig('zetamac', ['chain:mix'], {}, 0xc4a1, 60);
+    const run = () => {
+      const s = new Session(config);
+      const out: Array<{ prompt: string; answer: number }> = [];
+      for (let i = 0; i < 12; i++) {
+        const q = s.next();
+        expect(q.answer.den).toBe(1); // every intermediate is an integer
+        expect(q.answer.num).toBeGreaterThanOrEqual(1);
+        expect(q.answer.num).toBeLessThanOrEqual(400);
+        out.push({ prompt: q.prompt, answer: q.answer.num });
+        s.answer(String(q.answer.num), 1200, 500);
+      }
+      return out;
+    };
+    const qs = run();
+    // within a cycle, prompt k+1 is the previous prompt wrapped in parentheses
+    for (const cycleStart of [0, 5, 10]) {
+      for (let i = cycleStart; i < Math.min(cycleStart + 4, 11); i++) {
+        const prev = (qs[i] as { prompt: string }).prompt;
+        const next = (qs[i + 1] as { prompt: string }).prompt;
+        expect(next.startsWith(`(${prev})`)).toBe(true);
+      }
+    }
+    // cycle boundaries: questions 1 and 6 are bare products (no parens)
+    expect((qs[0] as { prompt: string }).prompt).not.toContain('(');
+    expect((qs[5] as { prompt: string }).prompt).not.toContain('(');
+    expect((qs[10] as { prompt: string }).prompt).not.toContain('(');
+    // the op cycle is × − ÷ + ×
+    expect((qs[1] as { prompt: string }).prompt).toContain('−');
+    expect((qs[2] as { prompt: string }).prompt).toContain('÷');
+    expect((qs[3] as { prompt: string }).prompt).toContain('+');
+    expect((qs[4] as { prompt: string }).prompt.split('×').length).toBe(3); // two × signs
+    // deterministic
+    expect(run()).toEqual(qs);
   });
 
   it('zetamac-parity sessions sample ops uniformly even with skewed stats', () => {

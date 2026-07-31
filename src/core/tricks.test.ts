@@ -8,7 +8,7 @@ import {
 import { rat } from './rational';
 import { TECHNIQUES, technique, explain, answerDisplay } from './tricks';
 
-const EVERY_BUCKET = [...ALL_BUCKETS, ...ZETA_BUCKETS, ...FERMI_BUCKETS];
+const EVERY_BUCKET = [...ALL_BUCKETS, ...ZETA_BUCKETS, ...FERMI_BUCKETS, 'chain:mix'];
 
 function spec(op: Op, operandClass: string, prompt: string, answer: ReturnType<typeof rat>): QuestionSpec {
   const bucketId = `${op}:${operandClass}`;
@@ -206,6 +206,14 @@ describe('explain — pinned worked examples (the trick chosen matches the opera
       techniqueId: 'division-in-disguise',
       steps: ['? = 138.6 ÷ 66', 'scale ×10: 1386 ÷ 66 = 21', '÷10 back → 2.1'],
     });
+  });
+
+  it('chains explain as a running total, one step per operation', () => {
+    const e = explain(spec('chain', 'mix', '((7 × 8) − 3) ÷ 2', rat(53, 2)));
+    // note: crafted spec; real chains always divide exactly — steps still fold correctly
+    expect(e.techniqueId).toBe('running-total');
+    expect(e.steps[0]).toBe('7 × 8 = 56');
+    expect(e.steps[1]).toBe('56 − 3 = 53');
   });
 
   it('fermi rounds both operands and reports the drift', () => {

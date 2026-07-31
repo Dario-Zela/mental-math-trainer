@@ -25,6 +25,7 @@ const WEEKS = 12;
 const TARGETS = {
   'add:2d2d': 3000, 'add:3d2d': 3000, 'add:3d3d': 5000,
   'sub:2d2d': 3000, 'sub:3d2d': 3000, 'sub:3d3d': 5000,
+  'add:1d1d': 1500, 'sub:1d1d': 2000, 'chain:mix': 5000,
   'mul:1x1': 2000, 'mul:1x2': 4000, 'mul:2x2': 9000, 'mul:1x3': 8000,
   'div:1x2': 5000, 'div:2x2': 10000, 'div:1x3': 9000,
   'frac_add:small': 10000, 'frac_add:any': 10000,

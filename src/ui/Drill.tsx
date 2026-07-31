@@ -319,12 +319,19 @@ export function Drill({ config, onExit, onRestart }: DrillProps) {
           <RevealPanel spec={revealed.spec} verdict={revealed.verdict} />
         ) : (
           <>
-            <div className="prompt" aria-label={`Question: ${question?.prompt ?? ''}`}>
+            <div
+              className="prompt"
+              aria-label={`Question: ${question?.prompt ?? ''}`}
+              style={(question?.prompt.length ?? 0) > 16 ? { fontSize: 'clamp(1.5rem, 4.5vw, 2.6rem)' } : undefined}
+            >
               {question?.prompt}
               {question?.op === 'recip' && (
                 <span className="hint">{question.grading === 'sig3' ? 'to 3 s.f.' : 'as a decimal'}</span>
               )}
               {question?.grading === 'rel5' && <span className="hint">within 5%</span>}
+              {question?.op === 'chain' && question.prompt.startsWith('(') && (
+                <span className="hint">build on your last answer</span>
+              )}
             </div>
             <div className="entry" aria-label="Your answer">
               {input}

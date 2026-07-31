@@ -37,6 +37,7 @@ const TARGET_MS_BY_OP: Record<string, number> = {
 };
 
 const TARGET_MS_BY_BUCKET: Record<string, number> = {
+  'add:1d1d': 1500, 'sub:1d1d': 2000, 'chain:mix': 5000,
   'add:3d3d': 5000, 'sub:3d3d': 5000,
   'mul:1x1': 2000, 'mul:1x2': 4000, 'mul:2x2': 9000, 'mul:1x3': 8000, 'mul:zeta': 5000,
   'div:1x2': 5000, 'div:2x2': 10_000, 'div:1x3': 9000, 'div:zeta': 5000,

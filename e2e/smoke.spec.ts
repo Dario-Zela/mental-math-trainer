@@ -147,6 +147,32 @@ test('blitz fast-restart: r discards the round and starts fresh', async ({ page 
   await expect(page.getByText('No sessions yet — run a drill and your training curve starts here.')).toBeVisible();
 });
 
+test('chain blitz: the next prompt wraps the answer you just gave', async ({ page }) => {
+  await page.goto('/mental-math-trainer/');
+  await expect(page.locator('.mode-row').first()).toBeVisible();
+  await page.selectOption('#blitz-pick', 'chain');
+  await page.waitForTimeout(150);
+  await page.keyboard.press('6');
+  await expect(page.locator('.prompt')).toBeVisible();
+
+  // q1 is a bare product; q2 must be (q1) − k
+  const p1El = page.locator('.prompt');
+  const p1 = (await p1El.textContent())!.replace('build on your last answer', '').trim();
+  const m = p1.replace('×', '*').match(/^(\d+) \* (\d+)$/) as RegExpMatchArray;
+  const v1 = Number(m[1]) * Number(m[2]);
+  await page.keyboard.type(String(v1), { delay: 20 });
+  await expect(p1El).toContainText(`(${p1})`);
+  const p2 = (await p1El.textContent())!.replace('build on your last answer', '').trim();
+  expect(p2.startsWith(`(${p1}) −`)).toBe(true);
+
+  // answer q2 by manipulating v1, as intended
+  const k = Number(p2.split('−').pop());
+  await page.keyboard.type(String(v1 - k), { delay: 20 });
+  await expect(p1El).toContainText('÷');
+  page.on('dialog', (d) => void d.accept());
+  await page.keyboard.press('Escape');
+});
+
 test.describe('accessibility', () => {
   const scan = async (page: Page) => {
     const results = await new AxeBuilder({ page }).analyze();

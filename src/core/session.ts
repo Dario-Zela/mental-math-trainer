@@ -5,7 +5,7 @@
  * snapshot), so shared links replay byte-identically anywhere.
  */
 import { mulberry32, type Rng } from './rng';
-import { generateQuestion, type QuestionSpec, ZETA_BUCKETS } from './questions';
+import { BLITZ_BUCKETS, CHAIN_BUCKET, CHAIN_LENGTH, chainSpec, generateChain, generateQuestion, type ChainCycle, type QuestionSpec, ZETA_BUCKETS } from './questions';
 import { type BucketStats, freshBucket, updateBucket, DIFFICULTY_START } from './buckets';
 import { pickBucket, snapshotWeights } from './scheduler';
 import { makeScorer, type Mode, type Scorer, type Verdict, ZETAMAC_DEFAULT_SEC, OPTIVER_SEC, FERMI_SEC } from './scoring';
@@ -36,9 +36,13 @@ export function isBenchmark(config: SessionConfig): boolean {
   );
 }
 
-/** The times-tables blitz: zetamac-style, single mul:1x1 bucket. Gets fast-restart UX. */
+/** A blitz round: zetamac-style with a single 1-digit-recall (or chain) bucket. Gets fast-restart UX. */
 export function isBlitz(config: SessionConfig): boolean {
-  return config.mode === 'zetamac' && config.buckets.length === 1 && config.buckets[0] === 'mul:1x1';
+  return (
+    config.mode === 'zetamac' &&
+    config.buckets.length === 1 &&
+    Object.values(BLITZ_BUCKETS).includes(config.buckets[0] as string)
+  );
 }
 
 /** Build a fresh session config from the user's current stats. */
@@ -118,6 +122,8 @@ export class Session {
   private readonly ring: string[] = [];
   private readonly counts: Record<string, number> = {};
   private stats: Record<string, BucketStats>;
+  /** Current chain cycle: each question wraps the previous one — state lives here, still pure in (seed, config). */
+  private chain: { cycle: ChainCycle; idx: number } | null = null;
 
   constructor(config: SessionConfig, initialStats: Record<string, BucketStats> = {}) {
     this.config = config;
@@ -137,6 +143,17 @@ export class Session {
   /** Draw the next question. Deterministic given (seed, config). */
   next(now = 0): QuestionSpec {
     const bucket = pickBucket(this.rng, this.config.buckets, this.config.weights, this.counts, this.log.length);
+    if (bucket === CHAIN_BUCKET) {
+      // chain questions extend each other; the ring buffer is irrelevant here
+      if (this.chain === null || this.chain.idx >= CHAIN_LENGTH) {
+        this.chain = { cycle: generateChain(this.rng), idx: 0 };
+      }
+      const q = chainSpec(this.chain.cycle, this.chain.idx, now);
+      this.chain.idx += 1;
+      this.counts[bucket] = (this.counts[bucket] ?? 0) + 1;
+      this.current = q;
+      return q;
+    }
     const difficulty = (this.config.difficulties[this.config.buckets.indexOf(bucket)] ?? 15) / 15;
     const q = generateQuestion(bucket, this.rng, now, this.ring, difficulty);
     this.ring.push(q.prompt);
