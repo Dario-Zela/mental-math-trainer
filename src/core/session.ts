@@ -36,6 +36,11 @@ export function isBenchmark(config: SessionConfig): boolean {
   );
 }
 
+/** The times-tables blitz: zetamac-style, single mul:1x1 bucket. Gets fast-restart UX. */
+export function isBlitz(config: SessionConfig): boolean {
+  return config.mode === 'zetamac' && config.buckets.length === 1 && config.buckets[0] === 'mul:1x1';
+}
+
 /** Build a fresh session config from the user's current stats. */
 export function makeConfig(
   mode: Mode,

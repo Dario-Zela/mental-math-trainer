@@ -149,7 +149,7 @@ export function Home({ onStart }: { onStart(config: SessionConfig): void }) {
           <span className="key" aria-hidden="true">6</span>
           <span>
             <span className="name">Times-tables blitz</span>
-            <span className="desc">One minute of bare 1×1 recall — the foundation every other trick stands on.</span>
+            <span className="desc">One minute of bare 1×1 recall — the foundation every other trick stands on. Fumbled? <strong>r</strong> restarts instantly.</span>
           </span>
           <span className="meta">60s · +1 · auto-advance</span>
         </button>

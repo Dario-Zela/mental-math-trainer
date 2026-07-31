@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useStore } from './storeContext';
 import { bucketLabel, fmtClock, fmtMs, todayLocal } from './labels';
-import { Session, makeConfig, type QuestionRecord, type SessionConfig, type SessionSummary } from '../core/session';
+import { Session, isBlitz, makeConfig, type QuestionRecord, type SessionConfig, type SessionSummary } from '../core/session';
 import { applyKey, matches, parseAnswer } from '../core/answer';
 import { applySession } from '../store/persist';
 import { appendHistory, historyRows } from '../store/history';
@@ -45,6 +45,7 @@ export function Drill({ config, onExit, onRestart }: DrillProps) {
   // coach mode (focus drills only): a missed or surrendered question pauses
   // on its worked solution until Enter
   const coach = store.settings.coach && rules.mode === 'focus';
+  const blitz = isBlitz(config);
   const [revealed, setRevealed] = useState<{ spec: QuestionSpec; verdict: Verdict } | null>(null);
 
   const startWallRef = useRef(0);       // performance.now() at clock start
@@ -188,6 +189,11 @@ export function Drill({ config, onExit, onRestart }: DrillProps) {
     if (window.confirm('Abort this session? It will be discarded.')) onExit();
   }, [onExit]);
 
+  /** Blitz fast-restart: discard this round (nothing commits) and go again fresh. */
+  const restart = useCallback(() => {
+    onRestart(makeConfig(config.mode, config.buckets, store.buckets, randomSeed(Math.random()), config.durationSec));
+  }, [onRestart, config, store.buckets]);
+
   useEffect(() => {
     if (phase !== 'running') return;
     const onKey = (e: KeyboardEvent) => {
@@ -214,6 +220,11 @@ export function Drill({ config, onExit, onRestart }: DrillProps) {
       if (coach && e.key === 'h') {
         e.preventDefault();
         surrender();
+        return;
+      }
+      if (blitz && e.key === 'r') {
+        e.preventDefault();
+        restart();
         return;
       }
       if (e.key === 'Escape') {
@@ -246,7 +257,7 @@ export function Drill({ config, onExit, onRestart }: DrillProps) {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [phase, input, question, rules, submit, abort, finish, revealed, coach, surrender, advance]);
+  }, [phase, input, question, rules, submit, abort, finish, revealed, coach, surrender, advance, blitz, restart]);
 
   if (phase === 'done' && applied) {
     return (
@@ -337,7 +348,7 @@ export function Drill({ config, onExit, onRestart }: DrillProps) {
           {revealed
             ? <><kbd>Enter</kbd> next question</>
             : rules.autoAdvance
-              ? <>type the answer — it advances itself</>
+              ? <>type the answer — it advances itself{blitz && <> · <kbd>r</kbd> restart</>}</>
               : rules.allowSkip
                 ? <><kbd>Enter</kbd> submit · <kbd>Enter</kbd> on empty skips{coach && <> · <kbd>h</kbd> show the trick</>}</>
                 : null}

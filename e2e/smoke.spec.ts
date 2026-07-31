@@ -113,6 +113,29 @@ test('coach mode: a Learn practice drill pauses on the worked trick after a miss
   await expect(page.locator('.review-steps .steps li').first()).toBeVisible();
 });
 
+test('blitz fast-restart: r discards the round and starts fresh', async ({ page }) => {
+  await page.goto('/mental-math-trainer/');
+  await expect(page.locator('.mode-row').first()).toBeVisible();
+  await page.waitForTimeout(150);
+  await page.keyboard.press('6');
+  await expect(page.locator('.prompt')).toBeVisible();
+
+  // answer one question so the score is non-zero
+  const prompt = (await page.locator('.prompt').textContent())!.trim();
+  const m = prompt.replace('×', '*').match(/^(\d+) \* (\d+)$/) as RegExpMatchArray;
+  await page.keyboard.type(String(Number(m[1]) * Number(m[2])), { delay: 20 });
+  await expect(page.locator('.drill-status .num').first()).toHaveText('1');
+
+  // r → fresh round: score resets, clock back at 1:00, no session was saved
+  await page.keyboard.press('r');
+  await expect(page.locator('.drill-status .num').first()).toHaveText('0');
+  await expect(page.locator('.drill-status')).toContainText('1:00');
+  page.on('dialog', (d) => void d.accept());
+  await page.keyboard.press('Escape'); // abort out
+  await page.goto('/mental-math-trainer/#/stats');
+  await expect(page.getByText('No sessions yet — run a drill and your training curve starts here.')).toBeVisible();
+});
+
 test.describe('accessibility', () => {
   const scan = async (page: Page) => {
     const results = await new AxeBuilder({ page }).analyze();

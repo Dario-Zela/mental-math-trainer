@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
-import { Session, makeConfig, isBenchmark, type SessionConfig } from './session';
+import { Session, makeConfig, isBenchmark, isBlitz, type SessionConfig } from './session';
 import { ZETA_BUCKETS, ALL_BUCKETS, CODEC_BUCKETS } from './questions';
 import { encodeSession, decodeSession } from './encode';
 import { freshBucket, updateBucket, type BucketStats } from './buckets';
@@ -155,6 +155,14 @@ describe('benchmark detection & weight snapshots', () => {
     expect(isBenchmark(makeConfig('zetamac', [...ZETA_BUCKETS], {}, 1, 300))).toBe(false);
     expect(isBenchmark(makeConfig('zetamac', ['add:2d2d'], {}, 1, 120))).toBe(false);
     expect(isBenchmark(makeConfig('optiver', [...ZETA_BUCKETS], {}, 1))).toBe(false);
+  });
+
+  it('blitz detection: zetamac mode with exactly the 1x1 bucket', () => {
+    expect(isBlitz(makeConfig('zetamac', ['mul:1x1'], {}, 1, 60))).toBe(true);
+    expect(isBlitz(makeConfig('zetamac', ['mul:1x1'], {}, 1, 120))).toBe(true); // duration-agnostic
+    expect(isBlitz(makeConfig('focus', ['mul:1x1'], {}, 1))).toBe(false);
+    expect(isBlitz(makeConfig('zetamac', ['mul:1x2'], {}, 1, 60))).toBe(false);
+    expect(isBlitz(makeConfig('zetamac', ['mul:1x1', 'mul:1x2'], {}, 1, 60))).toBe(false);
   });
 
   it('zetamac-parity sessions sample ops uniformly even with skewed stats', () => {
