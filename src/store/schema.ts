@@ -34,6 +34,13 @@ export interface StoreV2 {
     coach: boolean;
     /** Which blitz the home row launches. Additive field, defaults to times tables. */
     blitzType: 'mul' | 'add' | 'sub' | 'chain';
+    /**
+     * Memorise mode (focus drills): if recall hasn't produced a keystroke
+     * within the shot-clock window, the answer auto-reveals and scores as a
+     * skip — fail-fast retrieval practice, never derivation. Additive fields.
+     */
+    memorise: boolean;
+    memoriseMs: number;
   };
   buckets: Record<string, BucketStats>;
   sessions: SessionSummary[];
@@ -59,6 +66,8 @@ export function freshStore(): StoreV2 {
       sound: true,
       coach: false,
       blitzType: 'mul',
+      memorise: false,
+      memoriseMs: 1500,
     },
     buckets: {},
     sessions: [],
@@ -121,6 +130,10 @@ function sanitise(raw: Record<string, unknown>): StoreV2 {
   if (typeof settings.coach === 'boolean') out.settings.coach = settings.coach;
   if (isStr(settings.blitzType) && ['mul', 'add', 'sub', 'chain'].includes(settings.blitzType)) {
     out.settings.blitzType = settings.blitzType as 'mul' | 'add' | 'sub' | 'chain';
+  }
+  if (typeof settings.memorise === 'boolean') out.settings.memorise = settings.memorise;
+  if (isNum(settings.memoriseMs) && settings.memoriseMs >= 300 && settings.memoriseMs <= 10_000) {
+    out.settings.memoriseMs = settings.memoriseMs;
   }
 
   if (isObj(raw.buckets)) {

@@ -129,11 +129,12 @@ input[type='checkbox'] { accent-color: var(--accent); }
 .streak-line .stat .num { font-size: 1.35rem; font-weight: 700; }
 
 .mode-list { margin-top: 2rem; border-top: 1px solid var(--hairline-strong); }
+.mode-item { border-bottom: 1px solid var(--hairline); }
 .mode-row {
   display: grid; grid-template-columns: 2.6rem 1fr auto; gap: 1.1rem;
   align-items: center; width: 100%; text-align: left;
   padding: 1.05rem 0.4rem; background: none; border: none;
-  border-bottom: 1px solid var(--hairline); cursor: pointer;
+  cursor: pointer;
 }
 .mode-row:hover { background: var(--bg-raised); }
 .mode-row .key {
@@ -146,7 +147,17 @@ input[type='checkbox'] { accent-color: var(--accent); }
 .mode-row .desc { display: block; color: var(--ink-dim); font-size: 0.86rem; margin-top: 0.1rem; }
 .mode-row .meta { font-family: var(--font-num); font-size: 0.8rem; color: var(--ink-dim); text-align: right; }
 
-.focus-picker { display: flex; gap: 0.6rem; align-items: center; padding: 0.9rem 0.4rem 1.2rem; }
+/* per-row option strip: each mode's controls live with the mode, aligned to its text column */
+.mode-opts {
+  display: flex; flex-wrap: wrap; gap: 0.4rem 0.9rem; align-items: center;
+  padding: 0 0.4rem 0.95rem 4.1rem;
+}
+.mode-opts select, .mode-opts input[type='number'] { padding: 0.28rem 0.5rem; font-size: 0.84rem; }
+.mode-opts .opt-check { display: inline-flex; gap: 0.4rem; align-items: center; cursor: pointer; letter-spacing: 0.06em; }
+.mode-opts kbd {
+  font-family: var(--font-num); border: 1px solid var(--hairline); border-radius: 3px;
+  padding: 0 0.25rem; font-size: 0.68rem;
+}
 select {
   background: var(--bg-raised); border: 1px solid var(--hairline-strong);
   border-radius: 4px; padding: 0.45rem 0.6rem; font-size: 0.9rem;

@@ -44,9 +44,11 @@ export function Drill({ config, onExit, onRestart }: DrillProps) {
   const [applied, setApplied] = useState<Applied | null>(null);
   // coach mode (focus drills only): a missed or surrendered question pauses
   // on its worked solution until Enter
-  const coach = store.settings.coach && rules.mode === 'focus';
+  // memorise mode implies coaching: recall stalls auto-reveal on the shot clock
+  const memorise = store.settings.memorise && rules.mode === 'focus';
+  const coach = (store.settings.coach || memorise) && rules.mode === 'focus';
   const blitz = isBlitz(config);
-  const [revealed, setRevealed] = useState<{ spec: QuestionSpec; verdict: Verdict } | null>(null);
+  const [revealed, setRevealed] = useState<{ spec: QuestionSpec; verdict: Verdict; auto?: boolean } | null>(null);
 
   const startWallRef = useRef(0);       // performance.now() at clock start
   const startEpochRef = useRef(0);      // Date.now() at clock start
@@ -174,15 +176,27 @@ export function Drill({ config, onExit, onRestart }: DrillProps) {
     [session, advance, finish, store.settings.sound, rules.showFeedback, coach],
   );
 
-  /** Coach: surrender the question ('h') — scored as a skip, then study it. */
-  const surrender = useCallback(() => {
+  /** Coach: surrender the question ('h' or the memorise shot clock) — scored as a skip, then study it. */
+  const surrender = useCallback((auto = false) => {
     const spec = session.current;
     if (!spec) return;
     session.answer(null, null, null);
     if (store.settings.sound) sounds.buzz();
     setLastVerdict({ verdict: 'skip', ms: 0 });
-    setRevealed({ spec, verdict: 'skip' });
+    setRevealed({ spec, verdict: 'skip', auto });
   }, [session, store.settings.sound]);
+
+  // Memorise shot clock: if recall hasn't produced a KEYSTROKE within the
+  // window, reveal the answer — fail-fast retrieval practice, never
+  // derivation. Typing in progress is left alone: the clock tests recall,
+  // not typing speed.
+  useEffect(() => {
+    if (!memorise || phase !== 'running' || revealed !== null || question === null) return;
+    const t = setTimeout(() => {
+      if (firstKeyRef.current === null) surrender(true);
+    }, store.settings.memoriseMs);
+    return () => clearTimeout(t);
+  }, [memorise, phase, revealed, question, store.settings.memoriseMs, surrender]);
 
   const abort = useCallback(() => {
     // Sim rule: Esc aborts with confirm and DISCARDS the session — no pause.
@@ -219,7 +233,7 @@ export function Drill({ config, onExit, onRestart }: DrillProps) {
       }
       if (coach && e.key === 'h') {
         e.preventDefault();
-        surrender();
+        surrender(false);
         return;
       }
       if (blitz && e.key === 'r') {
@@ -316,7 +330,7 @@ export function Drill({ config, onExit, onRestart }: DrillProps) {
             <p className="preroll-note">80 questions · 8 minutes · +1 right, −1 wrong · no feedback until the end</p>
           </>
         ) : revealed ? (
-          <RevealPanel spec={revealed.spec} verdict={revealed.verdict} />
+          <RevealPanel spec={revealed.spec} verdict={revealed.verdict} auto={revealed.auto} />
         ) : (
           <>
             <div
@@ -357,7 +371,13 @@ export function Drill({ config, onExit, onRestart }: DrillProps) {
             : rules.autoAdvance
               ? <>type the answer — it advances itself{blitz && <> · <kbd>r</kbd> restart</>}</>
               : rules.allowSkip
-                ? <><kbd>Enter</kbd> submit · <kbd>Enter</kbd> on empty skips{coach && <> · <kbd>h</kbd> show the trick</>}</>
+                ? (
+                  <>
+                    <kbd>Enter</kbd> submit · <kbd>Enter</kbd> on empty skips
+                    {coach && <> · <kbd>h</kbd> show the trick</>}
+                    {memorise && <> · ⏱ {(store.settings.memoriseMs / 1000).toFixed(1)}s shot clock</>}
+                  </>
+                )
                 : null}
         </span>
         <span><kbd>Esc</kbd> {rules.durationMs === null ? 'end session' : 'abort'}</span>
@@ -369,7 +389,7 @@ export function Drill({ config, onExit, onRestart }: DrillProps) {
 /* ---------------------------------------------------------------------- */
 
 /** Coach study pause: the missed question, solved with its best technique. */
-function RevealPanel({ spec, verdict }: { spec: QuestionSpec; verdict: Verdict }) {
+function RevealPanel({ spec, verdict, auto }: { spec: QuestionSpec; verdict: Verdict; auto?: boolean }) {
   const e = explain(spec);
   return (
     <div className="reveal" aria-live="polite">
@@ -377,7 +397,9 @@ function RevealPanel({ spec, verdict }: { spec: QuestionSpec; verdict: Verdict }
       <p className="verdict-line">
         {verdict === 'wrong'
           ? <span className="bad">✗ wrong — here's the fast way</span>
-          : <span>⏭ revealed — scored as a skip</span>}
+          : auto
+            ? <span>⏱ shot clock — read it, say it, move on</span>
+            : <span>⏭ revealed — scored as a skip</span>}
       </p>
       <p className="micro">{technique(e.techniqueId).name}</p>
       <ol className="steps">

@@ -7,6 +7,10 @@ import { BLITZ_BUCKETS, FERMI_BUCKETS, OPTIVER_BUCKETS, ZETA_BUCKETS } from '../
 import { randomSeed } from '../core/rng';
 import { ZETAMAC_DEFAULT_SEC } from '../core/scoring';
 
+const BLITZ_NAMES = {
+  mul: 'times tables', add: '1-digit addition', sub: '1-digit subtraction', chain: 'progressive chain',
+} as const;
+
 export function Home({ onStart }: { onStart(config: SessionConfig): void }) {
   const { store, update } = useStore();
   const [focusBucket, setFocusBucket] = useState<string>(store.settings.enabledBuckets[0] ?? 'mul:2x2');
@@ -17,10 +21,8 @@ export function Home({ onStart }: { onStart(config: SessionConfig): void }) {
     ? focusBucket
     : store.settings.enabledBuckets[0] ?? 'mul:2x2';
 
-  const applyProfile = (id: string) => {
-    const p = PROFILES.find((x) => x.id === id);
-    if (p) update((s) => ({ ...s, settings: { ...s.settings, enabledBuckets: [...p.buckets] } }));
-  };
+  const setSetting = <K extends keyof typeof store.settings>(key: K, value: (typeof store.settings)[K]) =>
+    update((s) => ({ ...s, settings: { ...s.settings, [key]: value } }));
 
   const start = (mode: 'zetamac-bench' | 'zetamac-custom' | 'optiver' | 'focus' | 'fermi' | 'blitz') => {
     const seed = randomSeed(Math.random());
@@ -35,7 +37,6 @@ export function Home({ onStart }: { onStart(config: SessionConfig): void }) {
     } else if (mode === 'fermi') {
       onStart(makeConfig('fermi', [...FERMI_BUCKETS], store.buckets, seed));
     } else if (mode === 'blitz') {
-      // 60s auto-advance over the selected 1-digit-recall (or chain) bucket
       const bucket = BLITZ_BUCKETS[store.settings.blitzType] ?? 'mul:1x1';
       onStart(makeConfig('zetamac', [bucket], store.buckets, seed, 60));
     } else {
@@ -43,10 +44,12 @@ export function Home({ onStart }: { onStart(config: SessionConfig): void }) {
     }
   };
 
-  // number-key launch — the whole app is keyboard-first
+  // number-key launch — the whole app is keyboard-first. Form controls in the
+  // per-row option strips must never trigger a launch while focused.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLSelectElement || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.target instanceof HTMLSelectElement || e.target instanceof HTMLInputElement) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
       if (e.key === '1') start('zetamac-bench');
       else if (e.key === '2') start('zetamac-custom');
       else if (e.key === '3') start('optiver');
@@ -77,124 +80,152 @@ export function Home({ onStart }: { onStart(config: SessionConfig): void }) {
           <p className="sub">Pick a drill. Numbers launch, no mouse needed.</p>
         )}
         <div className="streak-line num" role="group" aria-label="Streak and personal bests">
-          <div className="stat">
-            <span className="micro">Streak</span>
-            <span className="num">{store.streak.current}d</span>
-          </div>
-          <div className="stat">
-            <span className="micro">Best streak</span>
-            <span className="num">{store.streak.best}d</span>
-          </div>
-          <div className="stat">
-            <span className="micro">Zetamac PB</span>
-            <span className="num">{store.pbs.zetamac ?? '—'}</span>
-          </div>
-          <div className="stat">
-            <span className="micro">Optiver PB</span>
-            <span className="num">{store.pbs.optiver ?? '—'}</span>
-          </div>
-          <div className="stat">
-            <span className="micro">Fermi PB</span>
-            <span className="num">{store.pbs.fermi ?? '—'}</span>
-          </div>
+          <div className="stat"><span className="micro">Streak</span><span className="num">{store.streak.current}d</span></div>
+          <div className="stat"><span className="micro">Best streak</span><span className="num">{store.streak.best}d</span></div>
+          <div className="stat"><span className="micro">Zetamac PB</span><span className="num">{store.pbs.zetamac ?? '—'}</span></div>
+          <div className="stat"><span className="micro">Optiver PB</span><span className="num">{store.pbs.optiver ?? '—'}</span></div>
+          <div className="stat"><span className="micro">Fermi PB</span><span className="num">{store.pbs.fermi ?? '—'}</span></div>
         </div>
       </section>
 
       <div className="mode-list">
-        <button type="button" className="mode-row" onClick={() => start('zetamac-bench')}>
-          <span className="key" aria-hidden="true">1</span>
-          <span>
-            <span className="name">Zetamac sprint — benchmark</span>
-            <span className="desc">Locked to Zetamac's default ranges. Scores comparable to community numbers.</span>
-          </span>
-          <span className="meta">120s · +1 · auto-advance</span>
-        </button>
-        <button type="button" className="mode-row" onClick={() => start('zetamac-custom')}>
-          <span className="key" aria-hidden="true">2</span>
-          <span>
-            <span className="name">Custom sprint</span>
-            <span className="desc">
-              {profile ? `${profile.name} profile` : 'Custom pick'} · {enabledCount} types, weakness-weighted.
-              Plotted as a separate series.
+        <div className="mode-item">
+          <button type="button" className="mode-row" onClick={() => start('zetamac-bench')}>
+            <span className="key" aria-hidden="true">1</span>
+            <span>
+              <span className="name">Zetamac sprint — benchmark</span>
+              <span className="desc">Locked to Zetamac's default ranges. Scores comparable to community numbers.</span>
             </span>
-          </span>
-          <span className="meta">{store.settings.mode.durationSec}s · +1 · auto-advance</span>
-        </button>
-        <button type="button" className="mode-row" onClick={() => start('optiver')}>
-          <span className="key" aria-hidden="true">3</span>
-          <span>
-            <span className="name">Optiver 80-in-8 — simulation</span>
-            <span className="desc">
-              Real conditions and the real question mix: 2–3-digit ±, 2×2 mults, decimals, small fractions, missing operands.
+            <span className="meta">120s · +1 · auto-advance</span>
+          </button>
+        </div>
+
+        <div className="mode-item">
+          <button type="button" className="mode-row" onClick={() => start('zetamac-custom')}>
+            <span className="key" aria-hidden="true">2</span>
+            <span>
+              <span className="name">Custom sprint</span>
+              <span className="desc">{enabledCount} enabled types, weakness-weighted. Plotted as a separate series.</span>
             </span>
-          </span>
-          <span className="meta">480s · 80q · +1/−1</span>
-        </button>
-        <button type="button" className="mode-row" onClick={() => start('fermi')}>
-          <span className="key" aria-hidden="true">4</span>
-          <span>
-            <span className="name">Fermi sprint</span>
-            <span className="desc">Estimate unwieldy products, quotients and percentages — within ±5% scores.</span>
-          </span>
-          <span className="meta">120s · +1 · ±5%</span>
-        </button>
-        <button type="button" className="mode-row" onClick={() => start('focus')}>
-          <span className="key" aria-hidden="true">5</span>
-          <span>
-            <span className="name">Focus drill</span>
-            <span className="desc">Untimed deliberate practice on one question type, per-question timings shown.</span>
-          </span>
-          <span className="meta">untimed · single type</span>
-        </button>
-        <button type="button" className="mode-row" onClick={() => start('blitz')}>
-          <span className="key" aria-hidden="true">6</span>
-          <span>
-            <span className="name">Blitz — {({ mul: 'times tables', add: '1-digit addition', sub: '1-digit subtraction', chain: 'progressive chain' })[store.settings.blitzType]}</span>
-            <span className="desc">
-              One minute of bare recall — or chains that build on your last answer. Fumbled? <strong>r</strong> restarts instantly.
+            <span className="meta">{store.settings.mode.durationSec}s · +1 · auto-advance</span>
+          </button>
+          <div className="mode-opts">
+            <label className="micro" htmlFor="profile-pick">Profile</label>
+            <select
+              id="profile-pick"
+              value={profile?.id ?? 'custom'}
+              onChange={(e) => {
+                const p = PROFILES.find((x) => x.id === e.target.value);
+                if (p) setSetting('enabledBuckets', [...p.buckets]);
+              }}
+            >
+              {PROFILES.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              {!profile && <option value="custom">Custom (from Settings)</option>}
+            </select>
+          </div>
+        </div>
+
+        <div className="mode-item">
+          <button type="button" className="mode-row" onClick={() => start('optiver')}>
+            <span className="key" aria-hidden="true">3</span>
+            <span>
+              <span className="name">Optiver 80-in-8 — simulation</span>
+              <span className="desc">
+                Real conditions and the real question mix: 2–3-digit ±, 2×2 mults, decimals, small fractions, missing operands.
+              </span>
             </span>
-          </span>
-          <span className="meta">60s · +1 · auto-advance</span>
-        </button>
-      </div>
-      <div className="focus-picker">
-        <label className="micro" htmlFor="blitz-pick">Blitz</label>
-        <select
-          id="blitz-pick"
-          value={store.settings.blitzType}
-          onChange={(e) =>
-            update((s) => ({
-              ...s,
-              settings: { ...s.settings, blitzType: e.target.value as 'mul' | 'add' | 'sub' | 'chain' },
-            }))
-          }
-        >
-          <option value="mul">× times tables</option>
-          <option value="add">+ 1-digit addition</option>
-          <option value="sub">− 1-digit subtraction</option>
-          <option value="chain">⛓ progressive chain</option>
-        </select>
-        <label className="micro" htmlFor="profile-pick">Profile</label>
-        <select id="profile-pick" value={profile?.id ?? 'custom'} onChange={(e) => applyProfile(e.target.value)}>
-          {PROFILES.map((p) => (
-            <option key={p.id} value={p.id}>{p.name}</option>
-          ))}
-          {!profile && <option value="custom">Custom (from Settings)</option>}
-        </select>
-        <label className="micro" htmlFor="focus-bucket">Focus type</label>
-        <select id="focus-bucket" value={effectiveFocus} onChange={(e) => setFocusBucket(e.target.value)}>
-          {store.settings.enabledBuckets.map((b) => (
-            <option key={b} value={b}>{bucketLabel(b)}</option>
-          ))}
-        </select>
-        <label className="micro" style={{ display: 'flex', gap: '0.35rem', alignItems: 'center', cursor: 'pointer' }}>
-          <input
-            type="checkbox"
-            checked={store.settings.coach}
-            onChange={(e) => update((s) => ({ ...s, settings: { ...s.settings, coach: e.target.checked } }))}
-          />
-          coach
-        </label>
+            <span className="meta">480s · 80q · +1/−1</span>
+          </button>
+        </div>
+
+        <div className="mode-item">
+          <button type="button" className="mode-row" onClick={() => start('fermi')}>
+            <span className="key" aria-hidden="true">4</span>
+            <span>
+              <span className="name">Fermi sprint</span>
+              <span className="desc">Estimate unwieldy products, quotients and percentages — within ±5% scores.</span>
+            </span>
+            <span className="meta">120s · +1 · ±5%</span>
+          </button>
+        </div>
+
+        <div className="mode-item">
+          <button type="button" className="mode-row" onClick={() => start('focus')}>
+            <span className="key" aria-hidden="true">5</span>
+            <span>
+              <span className="name">Focus drill</span>
+              <span className="desc">Untimed deliberate practice on one question type, per-question timings shown.</span>
+            </span>
+            <span className="meta">untimed · single type</span>
+          </button>
+          <div className="mode-opts">
+            <label className="micro" htmlFor="focus-bucket">Type</label>
+            <select id="focus-bucket" value={effectiveFocus} onChange={(e) => setFocusBucket(e.target.value)}>
+              {store.settings.enabledBuckets.map((b) => (
+                <option key={b} value={b}>{bucketLabel(b)}</option>
+              ))}
+            </select>
+            <label className="micro opt-check" htmlFor="coach-toggle">
+              <input
+                id="coach-toggle"
+                type="checkbox"
+                checked={store.settings.coach}
+                onChange={(e) => setSetting('coach', e.target.checked)}
+              />
+              coach — misses pause on the trick, <kbd>h</kbd> reveals
+            </label>
+            <label className="micro opt-check" htmlFor="memorise-toggle">
+              <input
+                id="memorise-toggle"
+                type="checkbox"
+                checked={store.settings.memorise}
+                onChange={(e) => setSetting('memorise', e.target.checked)}
+              />
+              memorise — auto-reveal after
+            </label>
+            <input
+              id="memorise-sec"
+              type="number"
+              min={0.3}
+              max={10}
+              step={0.1}
+              value={store.settings.memoriseMs / 1000}
+              aria-label="Memorise shot-clock seconds"
+              onChange={(e) => {
+                const sec = Number(e.target.value);
+                if (Number.isFinite(sec)) setSetting('memoriseMs', Math.round(Math.min(10, Math.max(0.3, sec)) * 1000));
+              }}
+              style={{ width: '4.2rem' }}
+            />
+            <span className="micro">s of no typing</span>
+          </div>
+        </div>
+
+        <div className="mode-item">
+          <button type="button" className="mode-row" onClick={() => start('blitz')}>
+            <span className="key" aria-hidden="true">6</span>
+            <span>
+              <span className="name">Blitz — {BLITZ_NAMES[store.settings.blitzType]}</span>
+              <span className="desc">
+                One minute of bare recall — or chains that build on your last answer. Fumbled? <strong>r</strong> restarts instantly.
+              </span>
+            </span>
+            <span className="meta">60s · +1 · auto-advance</span>
+          </button>
+          <div className="mode-opts">
+            <label className="micro" htmlFor="blitz-pick">Round</label>
+            <select
+              id="blitz-pick"
+              value={store.settings.blitzType}
+              onChange={(e) => setSetting('blitzType', e.target.value as 'mul' | 'add' | 'sub' | 'chain')}
+            >
+              <option value="mul">× times tables</option>
+              <option value="add">+ 1-digit addition</option>
+              <option value="sub">− 1-digit subtraction</option>
+              <option value="chain">⛓ progressive chain</option>
+            </select>
+          </div>
+        </div>
       </div>
     </>
   );
