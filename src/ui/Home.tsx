@@ -22,7 +22,7 @@ export function Home({ onStart }: { onStart(config: SessionConfig): void }) {
     if (p) update((s) => ({ ...s, settings: { ...s.settings, enabledBuckets: [...p.buckets] } }));
   };
 
-  const start = (mode: 'zetamac-bench' | 'zetamac-custom' | 'optiver' | 'focus' | 'fermi') => {
+  const start = (mode: 'zetamac-bench' | 'zetamac-custom' | 'optiver' | 'focus' | 'fermi' | 'blitz') => {
     const seed = randomSeed(Math.random());
     const { enabledBuckets, mode: modeCfg } = store.settings;
     if (mode === 'zetamac-bench') {
@@ -34,6 +34,9 @@ export function Home({ onStart }: { onStart(config: SessionConfig): void }) {
       onStart(makeConfig('optiver', [...OPTIVER_BUCKETS], store.buckets, seed));
     } else if (mode === 'fermi') {
       onStart(makeConfig('fermi', [...FERMI_BUCKETS], store.buckets, seed));
+    } else if (mode === 'blitz') {
+      // times-tables blitz: a fixed 60s auto-advance preset over the 1×1 bucket
+      onStart(makeConfig('zetamac', ['mul:1x1'], store.buckets, seed, 60));
     } else {
       onStart(makeConfig('focus', [effectiveFocus], store.buckets, seed));
     }
@@ -48,6 +51,7 @@ export function Home({ onStart }: { onStart(config: SessionConfig): void }) {
       else if (e.key === '3') start('optiver');
       else if (e.key === '4') start('fermi');
       else if (e.key === '5') start('focus');
+      else if (e.key === '6') start('blitz');
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -140,6 +144,14 @@ export function Home({ onStart }: { onStart(config: SessionConfig): void }) {
             <span className="desc">Untimed deliberate practice on one question type, per-question timings shown.</span>
           </span>
           <span className="meta">untimed · single type</span>
+        </button>
+        <button type="button" className="mode-row" onClick={() => start('blitz')}>
+          <span className="key" aria-hidden="true">6</span>
+          <span>
+            <span className="name">Times-tables blitz</span>
+            <span className="desc">One minute of bare 1×1 recall — the foundation every other trick stands on.</span>
+          </span>
+          <span className="meta">60s · +1 · auto-advance</span>
         </button>
       </div>
       <div className="focus-picker">

@@ -64,68 +64,75 @@
    "meanFirstKeyMs": 2439,
    "difficulty": 0.62
   },
-  "mul:1x2": {
+  "mul:1x1": {
    "attempts": 63,
    "errRate": 0.064,
-   "meanMs": 4141,
-   "meanFirstKeyMs": 2658,
+   "meanMs": 2070,
+   "meanFirstKeyMs": 1328,
    "difficulty": 0.6
+  },
+  "mul:1x2": {
+   "attempts": 58,
+   "errRate": 0.078,
+   "meanMs": 4078,
+   "meanFirstKeyMs": 2681,
+   "difficulty": 0.67
   },
   "mul:2x2": {
-   "attempts": 118,
-   "errRate": 0.27,
-   "meanMs": 12111,
-   "meanFirstKeyMs": 7963,
-   "difficulty": 0.35
+   "attempts": 148,
+   "errRate": 0.272,
+   "meanMs": 11062,
+   "meanFirstKeyMs": 6402,
+   "difficulty": 0.34
   },
   "mul:1x3": {
-   "attempts": 88,
-   "errRate": 0.08,
-   "meanMs": 7449,
-   "meanFirstKeyMs": 4311,
-   "difficulty": 0.66
-  },
-  "div:1x2": {
    "attempts": 28,
    "errRate": 0.046,
-   "meanMs": 4857,
-   "meanFirstKeyMs": 2536,
+   "meanMs": 7772,
+   "meanFirstKeyMs": 4059,
    "difficulty": 0.77
   },
+  "div:1x2": {
+   "attempts": 45,
+   "errRate": 0.022,
+   "meanMs": 3986,
+   "meanFirstKeyMs": 2413,
+   "difficulty": 0.71
+  },
   "div:2x2": {
-   "attempts": 105,
-   "errRate": 0.142,
-   "meanMs": 9567,
-   "meanFirstKeyMs": 5791,
-   "difficulty": 0.51
+   "attempts": 91,
+   "errRate": 0.19,
+   "meanMs": 11390,
+   "meanFirstKeyMs": 7615,
+   "difficulty": 0.55
   },
   "div:1x3": {
-   "attempts": 31,
-   "errRate": 0.07,
-   "meanMs": 8543,
-   "meanFirstKeyMs": 5711,
-   "difficulty": 0.75
-  },
-  "frac_add:small": {
    "attempts": 44,
    "errRate": 0.038,
-   "meanMs": 9238,
-   "meanFirstKeyMs": 5981,
+   "meanMs": 8314,
+   "meanFirstKeyMs": 5383,
    "difficulty": 0.79
   },
+  "frac_add:small": {
+   "attempts": 63,
+   "errRate": 0.024,
+   "meanMs": 10417,
+   "meanFirstKeyMs": 6512,
+   "difficulty": 0.75
+  },
   "frac_add:any": {
-   "attempts": 123,
-   "errRate": 0.156,
-   "meanMs": 12708,
-   "meanFirstKeyMs": 7944,
-   "difficulty": 0.53
+   "attempts": 97,
+   "errRate": 0.176,
+   "meanMs": 11564,
+   "meanFirstKeyMs": 7008,
+   "difficulty": 0.38
   },
   "frac_mul:small": {
-   "attempts": 37,
-   "errRate": 0.044,
-   "meanMs": 9479,
-   "meanFirstKeyMs": 5744,
-   "difficulty": 0.6
+   "attempts": 68,
+   "errRate": 0.028,
+   "meanMs": 7576,
+   "meanFirstKeyMs": 4225,
+   "difficulty": 0.73
   },
   "frac_mul:any": {
    "attempts": 6,
@@ -135,81 +142,81 @@
    "difficulty": 0.42
   },
   "dec_mul:clean": {
-   "attempts": 77,
-   "errRate": 0.075,
-   "meanMs": 3872,
-   "meanFirstKeyMs": 2041,
-   "difficulty": 0.56
+   "attempts": 32,
+   "errRate": 0.057,
+   "meanMs": 3986,
+   "meanFirstKeyMs": 2212,
+   "difficulty": 0.65
   },
   "dec_mul:ugly": {
-   "attempts": 92,
-   "errRate": 0.225,
-   "meanMs": 9184,
-   "meanFirstKeyMs": 5096,
-   "difficulty": 0.37
+   "attempts": 105,
+   "errRate": 0.232,
+   "meanMs": 9320,
+   "meanFirstKeyMs": 5488,
+   "difficulty": 0.53
   },
   "pct_of:clean": {
-   "attempts": 45,
-   "errRate": 0.064,
-   "meanMs": 4854,
-   "meanFirstKeyMs": 2858,
-   "difficulty": 0.81
-  },
-  "pct_of:ugly": {
    "attempts": 54,
    "errRate": 0.075,
    "meanMs": 5905,
    "meanFirstKeyMs": 4011,
    "difficulty": 0.77
   },
-  "pct_change:clean": {
+  "pct_of:ugly": {
    "attempts": 62,
    "errRate": 0.078,
    "meanMs": 5053,
    "meanFirstKeyMs": 2597,
    "difficulty": 0.88
   },
+  "pct_change:clean": {
+   "attempts": 59,
+   "errRate": 0.034,
+   "meanMs": 6175,
+   "meanFirstKeyMs": 3799,
+   "difficulty": 0.65
+  },
   "pct_change:ugly": {
-   "attempts": 119,
-   "errRate": 0.142,
-   "meanMs": 7287,
-   "meanFirstKeyMs": 4483,
-   "difficulty": 0.47
+   "attempts": 147,
+   "errRate": 0.133,
+   "meanMs": 6382,
+   "meanFirstKeyMs": 3863,
+   "difficulty": 0.62
   },
   "recip:term": {
-   "attempts": 87,
-   "errRate": 0.025,
-   "meanMs": 3606,
-   "meanFirstKeyMs": 2182,
-   "difficulty": 0.8
-  },
-  "add:zeta": {
    "attempts": 68,
    "errRate": 0.08,
-   "meanMs": 3068,
-   "meanFirstKeyMs": 1801,
+   "meanMs": 4091,
+   "meanFirstKeyMs": 2402,
    "difficulty": 0.9
   },
-  "sub:zeta": {
+  "add:zeta": {
    "attempts": 75,
    "errRate": 0.042,
    "meanMs": 2415,
    "meanFirstKeyMs": 1492,
    "difficulty": 0.78
   },
-  "mul:zeta": {
+  "sub:zeta": {
    "attempts": 88,
    "errRate": 0.066,
-   "meanMs": 4510,
-   "meanFirstKeyMs": 2801,
+   "meanMs": 2706,
+   "meanFirstKeyMs": 1680,
    "difficulty": 0.78
   },
-  "div:zeta": {
+  "mul:zeta": {
    "attempts": 72,
    "errRate": 0.021,
    "meanMs": 5228,
    "meanFirstKeyMs": 3540,
    "difficulty": 0.73
+  },
+  "div:zeta": {
+   "attempts": 81,
+   "errRate": 0.036,
+   "meanMs": 3821,
+   "meanFirstKeyMs": 2579,
+   "difficulty": 0.71
   }
  },
  "sessions": [

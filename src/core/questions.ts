@@ -52,7 +52,7 @@ export const ARROW = '→'; // →
 export const OPERAND_CLASSES: Record<Exclude<Op, 'fermi'>, string[]> = {
   add: ['2d2d', '3d2d', '3d3d'],
   sub: ['2d2d', '3d2d', '3d3d'],
-  mul: ['1x2', '2x2', '1x3'],
+  mul: ['1x1', '1x2', '2x2', '1x3'],
   div: ['1x2', '2x2', '1x3'],
   frac_add: ['small', 'any'],
   frac_mul: ['small', 'any'],
@@ -113,6 +113,7 @@ export const CODEC_BUCKETS: string[] = [
   'recip:rep',
   'fermi:mul', 'fermi:div', 'fermi:pct',
   'missing:mul', 'dec_add:2dp', 'dec_div:1dp',
+  'mul:1x1',
 ];
 
 export function bucketOp(bucketId: string): Op {
@@ -135,6 +136,7 @@ const ADD_RANGES: Record<string, [[number, number], [number, number]]> = {
 };
 
 const MUL_RANGES: Record<string, [[number, number], [number, number]]> = {
+  '1x1': [[2, 9], [2, 9]], // bare times tables — the blitz round's bucket
   '1x2': [[2, 9], [10, 99]],
   '2x2': [[10, 99], [10, 99]],
   '1x3': [[2, 9], [100, 999]],

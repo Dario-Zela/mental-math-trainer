@@ -185,14 +185,14 @@ function Heatmap({ buckets }: { buckets: Record<string, BucketStats> }) {
         <thead>
           <tr>
             <th />
-            <th scope="col">I</th><th scope="col">II</th><th scope="col">III</th><th scope="col">Zetamac</th>
+            <th scope="col">I</th><th scope="col">II</th><th scope="col">III</th><th scope="col">IV</th><th scope="col">Zetamac</th>
           </tr>
         </thead>
         <tbody>
           {ops.map((op) => (
             <tr key={op}>
               <th scope="row" style={{ textAlign: 'left' }}>{OP_LABELS[op]}</th>
-              {[0, 1, 2].map((i) => {
+              {[0, 1, 2, 3].map((i) => {
                 const cls = OPERAND_CLASSES[op][i];
                 return cls === undefined
                   ? <td key={i} aria-hidden="true" />
@@ -206,6 +206,7 @@ function Heatmap({ buckets }: { buckets: Record<string, BucketStats> }) {
           <tr>
             <th scope="row" style={{ textAlign: 'left' }}>{OP_LABELS.fermi}</th>
             {FERMI_BUCKETS.map((b) => <HeatCell key={b} id={b} stats={buckets[b]} />)}
+            <td aria-hidden="true" />
             <td aria-hidden="true" />
           </tr>
         </tbody>

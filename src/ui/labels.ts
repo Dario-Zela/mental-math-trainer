@@ -25,6 +25,7 @@ export const CLASS_LABELS: Record<string, string> = {
   '2d2d': '2-digit ± 2-digit',
   '3d2d': '3-digit ± 2-digit',
   '3d3d': '3-digit ± 3-digit',
+  '1x1': 'times tables (1×1)',
   '1x2': '1×2 digit',
   '2x2': '2×2 digit',
   '1x3': '1×3 digit',

@@ -108,7 +108,7 @@ describe('generators', () => {
     expect(CODEC_BUCKETS.slice(23, 27)).toEqual([...ZETA_BUCKETS]);
     expect(CODEC_BUCKETS[22]).toBe('recip:term');
     expect(CODEC_BUCKETS.indexOf('recip:rep')).toBe(27);
-    expect(CODEC_BUCKETS.slice(31)).toEqual(['missing:mul', 'dec_add:2dp', 'dec_div:1dp']);
+    expect(CODEC_BUCKETS.slice(31)).toEqual(['missing:mul', 'dec_add:2dp', 'dec_div:1dp', 'mul:1x1']);
     for (const b of EVERY_BUCKET) expect(CODEC_BUCKETS).toContain(b);
     expect(new Set(CODEC_BUCKETS).size).toBe(CODEC_BUCKETS.length);
   });
@@ -168,6 +168,7 @@ describe('generators', () => {
     const RANGES: Record<string, [number, number][]> = {
       'add:2d2d': [[10, 99], [10, 99]],
       'add:3d3d': [[100, 999], [100, 999]],
+      'mul:1x1': [[2, 9], [2, 9]],
       'mul:1x2': [[2, 9], [10, 99]],
       'mul:2x2': [[10, 99], [10, 99]],
       'mul:1x3': [[2, 9], [100, 999]],

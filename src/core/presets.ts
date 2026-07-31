@@ -17,7 +17,7 @@ export const PROFILES: Profile[] = [
     id: 'starter',
     name: 'Starter',
     hint: 'the gentle end of every family — the default for a fresh install',
-    buckets: ['add:2d2d', 'sub:2d2d', 'mul:1x2', 'div:1x2', 'dec_mul:clean', 'pct_of:clean', 'recip:term'],
+    buckets: ['add:2d2d', 'sub:2d2d', 'mul:1x1', 'mul:1x2', 'div:1x2', 'dec_mul:clean', 'pct_of:clean', 'recip:term'],
   },
   {
     id: 'core-four',
@@ -26,7 +26,7 @@ export const PROFILES: Profile[] = [
     buckets: [
       'add:2d2d', 'add:3d2d', 'add:3d3d',
       'sub:2d2d', 'sub:3d2d', 'sub:3d3d',
-      'mul:1x2', 'mul:2x2', 'mul:1x3',
+      'mul:1x1', 'mul:1x2', 'mul:2x2', 'mul:1x3',
       'div:1x2', 'div:2x2', 'div:1x3',
     ],
   },
