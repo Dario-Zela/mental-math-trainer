@@ -186,17 +186,16 @@ export function Drill({ config, onExit, onRestart }: DrillProps) {
     setRevealed({ spec, verdict: 'skip', auto });
   }, [session, store.settings.sound]);
 
-  // Memorise shot clock: if recall hasn't produced a KEYSTROKE within the
-  // window, reveal the answer — fail-fast retrieval practice, never
-  // derivation. Typing in progress is left alone: the clock tests recall,
-  // not typing speed.
+  // Memorise shot clock: reveal when NO keystroke lands within the window.
+  // Armed from the prompt and RE-armed by every accepted keystroke (the
+  // `input` dep), so active typing is never interrupted — but a stall of the
+  // full window, before typing or mid-answer, reveals. Fail-fast retrieval
+  // practice: a half-typed answer you're deriving is still a freeze.
   useEffect(() => {
     if (!memorise || phase !== 'running' || revealed !== null || question === null) return;
-    const t = setTimeout(() => {
-      if (firstKeyRef.current === null) surrender(true);
-    }, store.settings.memoriseMs);
+    const t = setTimeout(() => surrender(true), store.settings.memoriseMs);
     return () => clearTimeout(t);
-  }, [memorise, phase, revealed, question, store.settings.memoriseMs, surrender]);
+  }, [memorise, phase, revealed, question, input, store.settings.memoriseMs, surrender]);
 
   const abort = useCallback(() => {
     // Sim rule: Esc aborts with confirm and DISCARDS the session — no pause.
