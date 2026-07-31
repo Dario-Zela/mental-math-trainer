@@ -109,7 +109,9 @@ test('coach mode: a Learn practice drill pauses on the worked trick after a miss
   await expect(page.locator('.reveal .steps li').first()).toBeVisible();
   await expect(page.getByText("✗ wrong — here's the fast way")).toBeVisible();
 
-  // Enter resumes; 'h' surrenders the next question and shows its solution
+  // Enter resumes (after the reveal's Enter-grace); 'h' surrenders the next
+  // question and shows its solution
+  await page.waitForTimeout(450);
   await page.keyboard.press('Enter');
   await expect(page.locator('.entry')).toBeVisible();
   await page.keyboard.press('h');
@@ -117,6 +119,7 @@ test('coach mode: a Learn practice drill pauses on the worked trick after a miss
   await expect(page.locator('.reveal .steps li').first()).toBeVisible();
 
   // Esc ends the focus session; review pass shows worked steps on every card
+  await page.waitForTimeout(450);
   await page.keyboard.press('Enter');
   await page.keyboard.press('Escape');
   await expect(page.locator('.results .score')).toBeVisible();
